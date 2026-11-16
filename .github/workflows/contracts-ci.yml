@@ -39,3 +39,7 @@ jobs:
       - name: Run tests
         working-directory: contracts
         run: forge test -vvv
+
+      - name: Run elevated fuzz tests
+        working-directory: contracts
+        run: forge test --fuzz-runs 1000
