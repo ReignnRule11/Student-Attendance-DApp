@@ -6,8 +6,8 @@ The repository contains a Sepolia-only deployment script. **No live deployment i
 
 ## Release gates before using a real deployment wallet
 
-- Review the immutable-admin design. The deployer becomes the permanent contract admin; the contract has no admin transfer or recovery function.
-- Review the documented instructor-revocation limitation: a revoked instructor can still manage sessions they created, and their signatures remain valid for those sessions.
+- Review the two-step administrator handover. The current admin proposes a non-zero address; only that pending address can accept. The accepting admin is also granted instructor access. The previous admin retains instructor access until the new admin explicitly revokes it.
+- Confirm instructor revocation blocks new attendance for that instructor's sessions and prevents the revoked instructor from pausing/resuming or rotating those sessions. Existing attendance records remain unchanged.
 - Complete dependency advisory triage and browser/Anvil integration testing before treating the application as production-ready.
 - Use a dedicated Sepolia-only deployer wallet. Fund it only with test ETH and keep its private key out of source control, chat, frontend variables, and shell history.
 - Confirm the RPC endpoint reports chain ID `11155111` and independently confirm the deployer address before broadcasting.
@@ -81,7 +81,7 @@ Wait for explorer verification to complete. Confirm the verified source, compile
 ## Post-deployment validation
 
 1. Confirm the explorer network is Sepolia and the contract address matches the broadcast receipt.
-2. Read `admin()` and `instructors(admin)`; both should identify the expected deployer and the instructor flag should be true.
+2. Read `admin()`, `pendingAdmin()`, and `instructors(admin)`; the admin should identify the expected deployer, pending admin should be the zero address, and the instructor flag should be true.
 3. Read `nextSessionId()`; the initial value should be `1`.
 4. Set `NEXT_PUBLIC_CONTRACT_ADDRESS` to the verified address in the web deployment environment. Set `NEXT_PUBLIC_SEPOLIA_RPC_URL` only to a public RPC endpoint intended for browser use.
 5. Use separate test wallets to authorize an instructor, register a student, create a short test session, sign a QR authorization, and submit attendance. Confirm the receipt and event on Sepolia Etherscan.
@@ -90,7 +90,7 @@ Wait for explorer verification to complete. Confirm the verified source, compile
 
 ## Operational cautions
 
-- The admin is immutable. Losing the deployer key permanently removes the ability to authorize/revoke instructors.
+- Administrator transfer is two-step, not key recovery. If the current admin key is lost before proposing a transfer, governance actions cannot be performed. Protect the current admin wallet and rehearse handover with test wallets.
 - Do not expose admin actions to student accounts.
 - Wallet addresses and attendance transactions are public and pseudonymous, not anonymous.
 - QR possession is not proof of physical presence.

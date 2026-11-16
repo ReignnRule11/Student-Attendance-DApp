@@ -6,10 +6,11 @@ The contract is the enforcement boundary. Client-side checks are convenience onl
 
 ### Authorization
 
-- The deployer is the immutable administrator.
-- Only the administrator can grant or revoke instructor privileges.
+- The deployer is the initial administrator. The current administrator can propose a non-zero successor; only the proposed address can accept the transfer.
+- On acceptance, the successor becomes administrator and is granted instructor access. The previous administrator retains instructor access until separately revoked.
+- Only the current administrator can grant or revoke instructor privileges.
 - Only an authorized instructor can register or revoke students.
-- Only the instructor who created a session or the administrator can pause/resume it or rotate its QR nonce.
+- Only the active instructor who created a session or the current administrator can pause/resume it or rotate its QR nonce. A revoked instructor cannot manage their old sessions.
 - Only registered students can submit attendance.
 
 ## QR authorization
@@ -31,7 +32,7 @@ The domain is:
 - chainId: current `block.chainid`
 - verifyingContract: this contract address
 
-The contract verifies the signature against the instructor recorded on the session. The QR expiry must not be in the past or later than the session end. Rotating the session nonce invalidates all previously issued QR authorizations for that session.
+The contract verifies the signature against the instructor recorded on the session and confirms that instructor remains authorized. Revoking an instructor therefore invalidates outstanding QR authorizations for their sessions, without modifying historical attendance. The QR expiry must not be in the past or later than the session end. Rotating the session nonce invalidates all previously issued QR authorizations for that session.
 
 The same valid QR is intentionally usable by multiple registered students. Per-student, per-session attendance state prevents an individual student from submitting twice. The contract does not implement global one-time QR consumption because that would allow the first student to invalidate the code for everyone else.
 
@@ -50,7 +51,7 @@ The same valid QR is intentionally usable by multiple registered students. Per-s
 ## Residual risks and limitations
 
 - **QR sharing does not prove physical presence.** A student can photograph or forward a QR code. Short expiries, frequent nonce rotation, and instructor supervision reduce but do not eliminate this risk.
-- The administrator is a privileged trust anchor. Production deployments should consider multisig administration and documented key-recovery procedures.
+- The administrator is a privileged trust anchor. Two-step handover reduces accidental transfer risk but is not key recovery; production deployments should consider multisig administration and documented operational procedures.
 - Wallet addresses are pseudonymous, not anonymous. On-chain attendance and transaction metadata are public and persistent.
 - Student registration and revocation are currently global rather than scoped to a course or institution.
 - Attendance is append-only in this contract: there is no delete or edit function. Incorrect records require an explicit, separately designed correction process rather than silent mutation.
