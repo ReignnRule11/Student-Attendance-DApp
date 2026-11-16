@@ -1,25 +1,26 @@
 import Link from "next/link";
 import { WalletPanel } from "../components/WalletPanel";
 import { AuthorizationSigner } from "../components/AuthorizationSigner";
+import { StudentAttendanceScanner } from "../components/StudentAttendanceScanner";
 
 const capabilities = [
   {
     number: "01",
     title: "Instructor-led sessions",
     description:
-      "Authorized instructors create time-bound sessions and issue signed QR authorizations.",
+      "Authorized instructors sign short-lived session QR codes bound to the Sepolia contract.",
   },
   {
     number: "02",
     title: "Wallet-based check-in",
     description:
-      "Registered students scan a session code and submit attendance from their own wallet.",
+      "Registered students scan a code, pass contract-state pre-checks, and submit attendance.",
   },
   {
     number: "03",
     title: "Verifiable records",
     description:
-      "The smart contract enforces eligibility, expiry, replay protection, and one check-in per session.",
+      "The smart contract enforces eligibility, expiry, nonce validity, and one check-in per session.",
   },
 ];
 
@@ -43,12 +44,13 @@ export default function Home() {
         </p>
         <div className="hero-actions">
           <Link className="primary-action" href="#wallet">Connect wallet <span aria-hidden="true">↗</span></Link>
-          <span className="phase-note">Phase 4 · Wallet and signing integration</span>
+          <span className="phase-note">Phase 5 · QR attendance workflow</span>
         </div>
       </section>
 
       <WalletPanel />
       <AuthorizationSigner />
+      <StudentAttendanceScanner />
 
       <section className="workflow" id="workflow">
         <div className="section-heading">
@@ -68,7 +70,7 @@ export default function Home() {
 
       <footer className="footer">
         <span>Student Attendance DApp</span>
-        <span>Testnet integration · No contract deployment claimed</span>
+        <span>Sepolia testnet · Contract deployment still required</span>
       </footer>
     </main>
   );
