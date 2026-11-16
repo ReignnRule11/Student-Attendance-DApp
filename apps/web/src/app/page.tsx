@@ -1,17 +1,19 @@
 import Link from "next/link";
+import { WalletPanel } from "../components/WalletPanel";
+import { AuthorizationSigner } from "../components/AuthorizationSigner";
 
 const capabilities = [
   {
     number: "01",
     title: "Instructor-led sessions",
     description:
-      "Authorized instructors will create time-bound attendance sessions and issue signed QR codes.",
+      "Authorized instructors create time-bound sessions and issue signed QR authorizations.",
   },
   {
     number: "02",
     title: "Wallet-based check-in",
     description:
-      "Registered students will scan a session code and submit attendance from their own wallet.",
+      "Registered students scan a session code and submit attendance from their own wallet.",
   },
   {
     number: "03",
@@ -29,45 +31,24 @@ export default function Home() {
           <span className="brand-mark">SA</span>
           <span>Student Attendance</span>
         </Link>
-        <span className="network-pill">
-          <span className="status-dot" />
-          Sepolia testnet target
-        </span>
+        <span className="network-pill"><span className="status-dot" /> Ethereum Sepolia</span>
       </header>
 
       <section className="hero">
         <p className="eyebrow">DECENTRALIZED ATTENDANCE</p>
-        <h1>
-          Attendance that is <span>verifiable.</span>
-        </h1>
+        <h1>Attendance that is <span>verifiable.</span></h1>
         <p className="hero-copy">
-          A wallet-based attendance workflow connecting instructor-authorized
-          sessions, QR check-ins, and tamper-resistant on-chain records.
+          Instructor-authorized sessions, wallet-based check-ins, and tamper-resistant
+          attendance records on Ethereum.
         </p>
         <div className="hero-actions">
-          <Link className="primary-action" href="#workflow">
-            Explore the workflow <span aria-hidden="true">↗</span>
-          </Link>
-          <span className="phase-note">Phase 3 · Web foundation</span>
+          <Link className="primary-action" href="#wallet">Connect wallet <span aria-hidden="true">↗</span></Link>
+          <span className="phase-note">Phase 4 · Wallet and signing integration</span>
         </div>
       </section>
 
-      <section className="status-panel" aria-label="Project integration status">
-        <div>
-          <p className="panel-label">CURRENT BUILD STATUS</p>
-          <h2>Frontend foundation</h2>
-          <p className="muted">
-            The contract baseline is merged. Wallet and QR integrations are
-            the next implementation steps.
-          </p>
-        </div>
-        <div className="status-list">
-          <span><i className="complete" /> Solidity contract baseline</span>
-          <span><i className="complete" /> Foundry security test baseline</span>
-          <span><i className="pending" /> Wallet connection</span>
-          <span><i className="pending" /> QR issue and scan flow</span>
-        </div>
-      </section>
+      <WalletPanel />
+      <AuthorizationSigner />
 
       <section className="workflow" id="workflow">
         <div className="section-heading">
@@ -87,7 +68,7 @@ export default function Home() {
 
       <footer className="footer">
         <span>Student Attendance DApp</span>
-        <span>Prototype · Not yet connected to a deployed contract</span>
+        <span>Testnet integration · No contract deployment claimed</span>
       </footer>
     </main>
   );
