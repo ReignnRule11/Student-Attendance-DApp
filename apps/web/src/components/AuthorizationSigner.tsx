@@ -21,6 +21,7 @@ export function AuthorizationSigner() {
   const [qrNonce, setQrNonce] = useState("1");
   const [expiresAt, setExpiresAt] = useState("");
   const [signature, setSignature] = useState("");
+  const [localError, setLocalError] = useState("");
 
   const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
   const validContractAddress = Boolean(contractAddress && isAddress(contractAddress));
@@ -28,6 +29,7 @@ export function AuthorizationSigner() {
 
   async function handleSign() {
     setSignature("");
+    setLocalError("");
     if (!canSign || !contractAddress) return;
 
     try {
@@ -104,7 +106,7 @@ export function AuthorizationSigner() {
         {isPending ? "Waiting for wallet…" : "Sign authorization"}
       </button>
 
-      {error && <p className="error-message" role="alert">{error.message}</p>}
+      {(localError || error?.message) && <p className="error-message" role="alert">{localError || error?.message}</p>}
       {signature && (
         <div className="signature-result">
           <p className="panel-label">SIGNATURE CREATED · NOT SUBMITTED</p>
