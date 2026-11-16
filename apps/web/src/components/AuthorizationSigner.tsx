@@ -33,11 +33,16 @@ export function AuthorizationSigner() {
     if (!canSign || !contractAddress) return;
 
     try {
+      if (![sessionId, qrNonce, expiresAt].every((value) => /^\\d+$/.test(value.trim()))) {
+        throw new Error("Session ID, QR nonce, and expiry must be positive integers.");
+      }
+
       const session = BigInt(sessionId);
       const nonce = BigInt(qrNonce);
       const expiry = BigInt(expiresAt);
+      const zero = BigInt(0);
 
-      if (session <= 0n || nonce <= 0n || expiry <= 0n) {
+      if (session <= zero || nonce <= zero || expiry <= zero) {
         throw new Error("Session ID, QR nonce, and expiry must be positive integers.");
       }
 
@@ -60,10 +65,11 @@ export function AuthorizationSigner() {
       setSignature(result);
     } catch (signingError) {
       setSignature("");
-      if (signingError instanceof Error) {
-        // The wallet's rejection or input error is surfaced below by the hook where available.
-        console.error("EIP-712 signing was not completed:", signingError.message);
-      }
+      setLocalError(
+        signingError instanceof Error
+          ? signingError.message
+          : "Signing failed. Check the wallet and try again.",
+      );
     }
   }
 
