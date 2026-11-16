@@ -62,6 +62,7 @@ contract StudentAttendanceTest {
 
     function testUnauthorizedAddressCannotRegisterStudent() public {
         vm.expectRevert(StudentAttendance.Unauthorized.selector);
+        vm.prank(otherStudent);
         attendance.registerStudent(otherStudent);
     }
 
