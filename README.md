@@ -2,7 +2,7 @@
 
 A wallet-based attendance application targeting **Ethereum Sepolia**. Authorized instructors create time-bounded sessions, issue EIP-712 QR authorizations, and registered students submit attendance from their own wallets.
 
-> **Project status:** Phases 1–7 are merged and their relevant CI checks passed. Phase 8 adds Sepolia deployment tooling and a controlled deployment runbook. No live contract deployment, independent audit, or production-readiness claim is made.
+> **Project status:** Phases 1–8 are merged. Phase 9 adds two-step administrator handover and strict instructor-revocation enforcement. No live contract deployment, independent audit, or production-readiness claim is made.
 
 ## Phase 6 dashboard
 
@@ -39,7 +39,7 @@ The QR is reusable by multiple students until expiry or nonce rotation. It is no
 
 A QR code is a bearer artifact: someone may photograph or share it. Short expiry and instructor-controlled nonce rotation reduce this risk, but QR scanning alone **does not prove physical presence**.
 
-The contract does not expose an enumerable student roster or an attendance count. The dashboard therefore supports direct wallet and session lookups rather than implying a complete roster or total.
+Revoking an instructor invalidates new attendance for their sessions while preserving already-recorded attendance. The contract does not expose an enumerable student roster or an attendance count. The dashboard therefore supports direct wallet and session lookups rather than implying a complete roster or total.
 
 ## Repository structure
 
@@ -101,7 +101,8 @@ The contract does not expose an enumerable student roster or an attendance count
 5. Instructor QR generation, student camera/manual scanning, and attendance transaction flow — **merged**.
 6. Instructor/student dashboards, session creation, student registration, and session controls — **merged; post-merge web CI passed**.
 7. Fuzz, invariant, and security validation — **merged; formatting, build, tests, and 1,000-run fuzz CI passed**.
-8. Sepolia deployment tooling and controlled deployment runbook — **in progress; no live deployment claimed**.
+8. Sepolia deployment tooling and controlled deployment runbook — **merged; no live deployment claimed**.
+9. Governance hardening, two-step admin handover, and revoked-instructor session invalidation — **in progress**.
 
 ## Development
 
@@ -128,4 +129,4 @@ Copy `.env.example` to `apps/web/.env.local` for local frontend configuration. S
 
 ## Current implementation status
 
-Phase 6 provides role-aware dashboards and contract-backed management workflows. Phase 7 adds fuzz and stateful invariant tests; see `docs/PHASE-7-SECURITY-VALIDATION.md`. Phase 8 adds a Sepolia-only Foundry deployment script and a verification/post-deployment checklist; see `docs/DEPLOYMENT.md`. Browser-level integration tests, dependency advisory triage, and independent audit remain outstanding. No deployment or live transaction is claimed.
+Phase 6 provides role-aware dashboards and contract-backed management workflows. Phase 7 adds fuzz and stateful invariant tests; see `docs/PHASE-7-SECURITY-VALIDATION.md`. Phase 8 adds a Sepolia-only Foundry deployment script and a verification/post-deployment checklist; Phase 9 hardens administrator handover and instructor revocation. Browser-level integration tests, dependency advisory triage, and independent audit remain outstanding. No deployment or live transaction is claimed.
