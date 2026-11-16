@@ -2,6 +2,9 @@ import type { Abi } from "viem";
 
 export const studentAttendanceAbi = [
   { type: "function", name: "admin", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "address" }] },
+  { type: "function", name: "pendingAdmin", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "address" }] },
+  { type: "function", name: "proposeAdmin", stateMutability: "nonpayable", inputs: [{ name: "proposedAdmin", type: "address" }], outputs: [] },
+  { type: "function", name: "acceptAdmin", stateMutability: "nonpayable", inputs: [], outputs: [] },
   { type: "function", name: "nextSessionId", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "uint256" }] },
   { type: "function", name: "instructors", stateMutability: "view", inputs: [{ name: "", type: "address" }], outputs: [{ name: "", type: "bool" }] },
   { type: "function", name: "registeredStudents", stateMutability: "view", inputs: [{ name: "", type: "address" }], outputs: [{ name: "", type: "bool" }] },
@@ -22,6 +25,12 @@ export const studentAttendanceAbi = [
   { type: "function", name: "setSessionActive", stateMutability: "nonpayable", inputs: [{ name: "sessionId", type: "uint256" }, { name: "active", type: "bool" }], outputs: [] },
   { type: "function", name: "rotateQrNonce", stateMutability: "nonpayable", inputs: [{ name: "sessionId", type: "uint256" }], outputs: [] },
   { type: "function", name: "markAttendance", stateMutability: "nonpayable", inputs: [{ name: "sessionId", type: "uint256" }, { name: "expiresAt", type: "uint64" }, { name: "qrNonce", type: "uint64" }, { name: "signature", type: "bytes" }], outputs: [] },
+  { type: "event", name: "AdminTransferProposed", anonymous: false, inputs: [
+    { name: "currentAdmin", type: "address", indexed: true }, { name: "proposedAdmin", type: "address", indexed: true },
+  ] },
+  { type: "event", name: "AdminTransferred", anonymous: false, inputs: [
+    { name: "previousAdmin", type: "address", indexed: true }, { name: "newAdmin", type: "address", indexed: true },
+  ] },
   { type: "event", name: "SessionCreated", anonymous: false, inputs: [
     { name: "sessionId", type: "uint256", indexed: true }, { name: "instructor", type: "address", indexed: true },
     { name: "startsAt", type: "uint64", indexed: false }, { name: "endsAt", type: "uint64", indexed: false },
