@@ -63,7 +63,7 @@ contract AttendanceInvariantHandler {
 
         vm.prank(student);
         try attendance.markAttendance(sessionId, expiry, nonce, abi.encodePacked(r, s, v)) { }
-        catch { }
+            catch { }
 
         uint64 recorded = attendance.attendanceAt(sessionId, student);
         if (firstRecordedAt == 0 && recorded != 0) firstRecordedAt = recorded;
