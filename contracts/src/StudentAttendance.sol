@@ -48,6 +48,7 @@ contract StudentAttendance {
     error InvalidQrNonce();
     error InvalidSignature();
     error NoPendingAdmin();
+    error InvalidAdminProposal();
 
     event InstructorUpdated(address indexed instructor, bool authorized);
     event AdminTransferProposed(address indexed currentAdmin, address indexed proposedAdmin);
@@ -88,7 +89,7 @@ contract StudentAttendance {
     /// @notice Propose a two-step administrator transfer.
     function proposeAdmin(address proposedAdmin) external onlyAdmin {
         if (proposedAdmin == address(0)) revert ZeroAddress();
-        if (proposedAdmin == admin) revert AlreadyAuthorized();
+        if (proposedAdmin == admin || proposedAdmin == address(this)) revert InvalidAdminProposal();
         pendingAdmin = proposedAdmin;
         emit AdminTransferProposed(admin, proposedAdmin);
     }
