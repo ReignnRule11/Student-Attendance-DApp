@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { isAddress } from "viem";
-import { useAccount, useChainId, useSignTypedData } from "wagmi";
+import { useAccount, useChainId, usePublicClient, useSignTypedData } from "wagmi";
+import { studentAttendanceAbi } from "../lib/contract/abi";
 import { sepolia } from "wagmi/chains";
 
 const attendanceTypes = {
@@ -17,6 +18,7 @@ const attendanceTypes = {
 export function AuthorizationSigner() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
+  const publicClient = usePublicClient();
   const { signTypedDataAsync, isPending, error } = useSignTypedData();
   const [sessionId, setSessionId] = useState("1");
   const [qrNonce, setQrNonce] = useState("1");
@@ -52,6 +54,25 @@ export function AuthorizationSigner() {
       if (expiry <= BigInt(Math.floor(Date.now() / 1000))) {
         throw new Error("Expiry must be a future Unix timestamp.");
       }
+
+      if (!publicClient || !address) throw new Error("Sepolia RPC is unavailable. Try again.");
+      const sessionInfo = await publicClient.readContract({
+        address: contractAddress as `0x${string}`,
+        abi: studentAttendanceAbi,
+        functionName: "sessions",
+        args: [session],
+      });
+      const [sessionInstructor, startsAt, endsAt, currentNonce, active] = sessionInfo;
+      const now = BigInt(Math.floor(Date.now() / 1000));
+      if (startsAt === BigInt(0)) throw new Error("The selected session does not exist.");
+      if (sessionInstructor.toLowerCase() !== address.toLowerCase()) {
+        throw new Error("Only the instructor who created this session can authorize its QR.");
+      }
+      if (!active || now < startsAt || now >= endsAt) {
+        throw new Error("The selected session is not currently active.");
+      }
+      if (nonce !== currentNonce) throw new Error("QR nonce is stale. Refresh it from the current session state.");
+      if (expiry > endsAt) throw new Error("QR expiry cannot exceed the session end time.");
 
       const result = await signTypedDataAsync({
         domain: {
