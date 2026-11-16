@@ -89,7 +89,9 @@ contract StudentAttendance {
     /// @notice Propose a two-step administrator transfer.
     function proposeAdmin(address proposedAdmin) external onlyAdmin {
         if (proposedAdmin == address(0)) revert ZeroAddress();
-        if (proposedAdmin == admin || proposedAdmin == address(this)) revert InvalidAdminProposal();
+        if (proposedAdmin == admin || proposedAdmin == address(this)) {
+            revert InvalidAdminProposal();
+        }
         pendingAdmin = proposedAdmin;
         emit AdminTransferProposed(admin, proposedAdmin);
     }
