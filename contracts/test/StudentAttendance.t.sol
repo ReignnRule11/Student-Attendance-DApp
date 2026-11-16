@@ -242,7 +242,6 @@ contract StudentAttendanceTest {
         attendance.createSession(uint64(block.timestamp + 1), uint64(block.timestamp + 1 hours));
     }
 
-
     function testAdminTransferRequiresProposalAndAcceptance() public {
         address proposed = vm.addr(OTHER_KEY);
 
