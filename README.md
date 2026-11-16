@@ -1,5 +1,7 @@
 # Student Attendance DApp
 
+[![Contracts CI](https://github.com/ReignnRule11/Student-Attendance-DApp/actions/workflows/contracts-ci.yml/badge.svg)](https://github.com/ReignnRule11/Student-Attendance-DApp/actions/workflows/contracts-ci.yml)
+
 [![Web CI](https://github.com/ReignnRule11/Student-Attendance-DApp/actions/workflows/web-ci.yml/badge.svg)](https://github.com/ReignnRule11/Student-Attendance-DApp/actions/workflows/web-ci.yml)
 
 A wallet-based attendance application targeting **Ethereum Sepolia**. Authorized instructors create time-bounded sessions, issue EIP-712 QR authorizations, and registered students submit attendance from their own wallets.
