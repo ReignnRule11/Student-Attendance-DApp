@@ -2,7 +2,7 @@
 
 A wallet-based attendance application targeting **Ethereum Sepolia**. Authorized instructors create time-bounded sessions, issue EIP-712 QR authorizations, and registered students submit attendance from their own wallets.
 
-> **Project status:** Phases 1–5 are merged. Phase 6 role-aware dashboards and on-chain management workflows are under review. No contract deployment, live transaction, independent audit, or production-readiness claim is made.
+> **Project status:** Phases 1–6 are merged. Phase 7 security hardening and adversarial validation are under review. No contract deployment, live transaction, independent audit, or production-readiness claim is made.
 
 ## Phase 6 dashboard
 
@@ -69,7 +69,7 @@ The contract does not expose an enumerable student roster or an attendance count
 │   └── tsconfig.json
 ├── contracts/
 │   ├── src/StudentAttendance.sol
-│   ├── test/StudentAttendance.t.sol
+│   ├── test/StudentAttendance.t.sol\n│   ├── test/StudentAttendanceInvariant.t.sol
 │   └── foundry.toml
 ├── docs/
 │   ├── DEPLOYMENT.md
@@ -124,4 +124,4 @@ Copy `.env.example` to `apps/web/.env.local` for local frontend configuration. S
 
 ## Current implementation status
 
-Phase 6 adds role-aware dashboard views, contract-backed role detection, session creation and lookup, student registration/revocation, admin instructor authorization/revocation, session pause/resume, QR nonce rotation, and per-wallet attendance checks. These on-chain workflows require a deployed `StudentAttendance` contract address and Sepolia RPC endpoint. No deployment or live transaction is claimed. Phase 6 is complete only after CI and deployment-backed verification.
+Phase 6 adds role-aware dashboard views, contract-backed role detection, session creation and lookup, student registration/revocation, admin instructor authorization/revocation, session pause/resume, QR nonce rotation, and per-wallet attendance checks. Phase 6 is merged and its post-merge web CI passed. These workflows still require a deployed contract address and Sepolia RPC endpoint. Phase 7 adds fuzz and stateful invariant tests; see `docs/PHASE-7-SECURITY-VALIDATION.md`. Browser-level integration tests, dependency advisory triage, deployment, and independent audit remain outstanding. No deployment or live transaction is claimed.
