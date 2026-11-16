@@ -1,17 +1,27 @@
 # Student Attendance DApp
 
-A wallet-based attendance application targeting **Ethereum Sepolia**. Authorized instructors issue short-lived EIP-712 QR authorizations; registered students scan the code and submit attendance from their own wallet.
+A wallet-based attendance application targeting **Ethereum Sepolia**. Authorized instructors create time-bounded sessions, issue EIP-712 QR authorizations, and registered students submit attendance from their own wallets.
 
-> **Project status:** Phases 1–4 are merged. Phase 5 QR generation and student check-in implementation is under review. No contract deployment, live transaction, independent audit, or production-readiness claim is made.
+> **Project status:** Phases 1–5 are merged. Phase 6 role-aware dashboards and on-chain management workflows are under review. No contract deployment, live transaction, independent audit, or production-readiness claim is made.
+
+## Phase 6 dashboard
+
+- **Role detection:** reads the immutable contract admin, instructor authorization, and student registration for the connected wallet.
+- **Instructor workspace:** creates sessions, registers or revokes student wallets, loads sessions by ID, pauses/resumes sessions, and rotates QR nonces.
+- **Admin workspace:** authorizes or revokes instructors. The contract admin cannot revoke its own instructor role.
+- **Student workspace:** shows the connected wallet's registration role and supports per-session attendance checks.
+- **Transaction feedback:** waits for Sepolia receipts and links submitted transactions to Sepolia Etherscan.
+- **Grounded data:** session and role information is read from the contract. The contract has no student directory or attendance enumeration method, so the UI does not fabricate student lists or attendance totals.
+
+All transaction controls require a connected wallet on Sepolia and a configured deployed contract address. The contract remains authoritative; frontend checks are not security boundaries.
 
 ## Product workflow
 
 1. An instructor connects an authorized wallet on Sepolia.
-2. The instructor enters a session ID, current QR nonce, and expiry.
-3. The web app reads the session from the configured contract and checks that the connected wallet created the active session, the nonce is current, and expiry does not exceed the session end.
-4. The instructor signs the exact EIP-712 `AttendanceAuthorization(uint256 sessionId,uint256 qrNonce,uint256 expiresAt)` typed data and displays the resulting QR code.
-5. A registered student connects their wallet, scans the QR with the camera or pastes its payload, and submits attendance.
-6. The app checks student registration, session state, nonce, expiry, and previous attendance for usability. The contract independently enforces all security rules and records attendance.
+2. An instructor creates a time-bounded session through the dashboard.
+3. The instructor reads the session's current QR nonce, signs the exact EIP-712 attendance authorization, and displays the resulting QR.
+4. A registered student scans the QR or pastes its payload, then confirms the attendance transaction.
+5. The contract enforces registration, session state, signature, expiry, nonce validity, and one attendance per student/session.
 
 The QR is reusable by multiple students until expiry or nonce rotation. It is not a single-use token; the contract enforces one attendance per student per session.
 
@@ -21,29 +31,15 @@ The QR is reusable by multiple students until expiry or nonce rotation. It is no
 - **Wallet and chain client:** wagmi and viem, injected wallet connection, Sepolia chain enforcement.
 - **QR generation:** `qrcode.react`.
 - **Camera scanning:** `html5-qrcode`; camera access begins only after the student explicitly starts scanning. Manual payload entry is also available.
-- **Contract access:** typed ABI for the deployed `StudentAttendance` contract.
+- **Contract access:** typed ABI matching `contracts/src/StudentAttendance.sol`.
 - **Smart contracts:** Solidity and Foundry.
-- **Verification:** contract-enforced authorization and replay protection; frontend checks are for usability and are never treated as security boundaries.
 - **CI:** GitHub Actions for contract and frontend checks.
-
-### QR payload
-
-The versioned QR payload contains:
-- schema version (`1`)
-- Sepolia chain ID (`11155111`)
-- verifying contract address
-- session ID
-- QR nonce
-- expiry timestamp (Unix seconds)
-- 65-byte EIP-712 signature
-
-The signature covers the session ID, nonce, and expiry. The EIP-712 domain binds it to the `StudentAttendance` contract name/version, Sepolia chain ID, and verifying contract address. No student names, emails, matriculation numbers, or other student personal data are included.
 
 ### Trust boundaries and limitations
 
-The smart contract is authoritative for instructor permissions, student registration, session validity, QR authorization, expiry, and duplicate prevention. The frontend pre-checks can become stale; the contract revalidates when the transaction executes.
+A QR code is a bearer artifact: someone may photograph or share it. Short expiry and instructor-controlled nonce rotation reduce this risk, but QR scanning alone **does not prove physical presence**.
 
-A QR code is a bearer artifact: someone may photograph or share it. Short expiry and instructor-controlled nonce rotation reduce this risk, but QR scanning alone **does not prove physical presence**. Institutions requiring stronger presence assurance need a supervised process or additional controls.
+The contract does not expose an enumerable student roster or an attendance count. The dashboard therefore supports direct wallet and session lookups rather than implying a complete roster or total.
 
 ## Repository structure
 
@@ -60,6 +56,7 @@ A QR code is a bearer artifact: someone may photograph or share it. Short expiry
 │   │   │   └── page.tsx
 │   │   ├── components/
 │   │   │   ├── AuthorizationSigner.tsx
+│   │   │   ├── RoleDashboard.tsx
 │   │   │   ├── StudentAttendanceScanner.tsx
 │   │   │   └── WalletPanel.tsx
 │   │   └── lib/
@@ -89,8 +86,8 @@ A QR code is a bearer artifact: someone may photograph or share it. Short expiry
 - Enforce registered-student-only attendance and one attendance record per student per session.
 - Reject expired, forged, wrong-session, wrong-chain, and replayed authorizations.
 - Do not provide an administrative path to silently erase or rewrite attendance history.
-- Document transaction costs, public wallet activity, and the limitations of pseudonymous on-chain records.
 - Treat QR codes as shareable bearer artifacts, not proof of physical presence.
+- Remember that wallet addresses and transaction histories are public and pseudonymous, not anonymous.
 
 ## Delivery phases
 
@@ -98,20 +95,12 @@ A QR code is a bearer artifact: someone may photograph or share it. Short expiry
 2. Attendance contract, EIP-712 verification, and adversarial Foundry tests — **merged; CI passed**.
 3. Next.js web foundation and frontend CI — **merged; CI passed**.
 4. Sepolia wallet connection and EIP-712 signing foundation — **merged; CI passed**.
-5. Instructor QR generation, student camera/manual scanning, contract-state pre-checks, and attendance transaction flow — **implementation under review**.
-6. Instructor/student dashboards, session creation and student registration UI.
+5. Instructor QR generation, student camera/manual scanning, and attendance transaction flow — **merged**.
+6. Instructor/student dashboards, session creation, student registration, and session controls — **implementation under review**.
 7. End-to-end, fuzz, invariant, and security validation.
 8. Sepolia deployment, explorer verification, and deployment documentation.
 
-## Security test baseline
-
-The Foundry suite covers valid attendance, unauthorized registration, unregistered students, duplicate attendance, expired QR authorization, forged instructor signatures, cross-session replay, QR nonce rotation, chain-ID replay, paused sessions, and revoked students.
-
-The test suite is a baseline, not an independent security audit. Further fuzzing, invariant testing, and review are required before production use.
-
 ## Development
-
-Frontend commands:
 
 ```bash
 cd apps/web
@@ -135,4 +124,4 @@ Copy `.env.example` to `apps/web/.env.local` for local frontend configuration. S
 
 ## Current implementation status
 
-The Phase 5 branch adds signed QR generation, QR payload validation, camera/manual scanning, preflight reads for registration/session/duplicate status, and a `markAttendance` transaction flow. These features require a deployed `StudentAttendance` contract address and an available Sepolia RPC endpoint. Until those are configured, the UI intentionally disables live QR generation and student check-in. No deployment or live attendance transaction is claimed. Features and test results will be reported as complete only after CI and deployment-backed verification.
+Phase 6 adds role-aware dashboard views, contract-backed role detection, session creation and lookup, student registration/revocation, admin instructor authorization/revocation, session pause/resume, QR nonce rotation, and per-wallet attendance checks. These on-chain workflows require a deployed `StudentAttendance` contract address and Sepolia RPC endpoint. No deployment or live transaction is claimed. Phase 6 is complete only after CI and deployment-backed verification.
