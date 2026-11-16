@@ -69,8 +69,8 @@ contract StudentAttendanceTest {
         uint64 expiry = uint64(block.timestamp + 5 minutes);
         bytes memory signature = _sign(INSTRUCTOR_KEY, sessionId, 1, expiry);
 
-        vm.prank(otherStudent);
         vm.expectRevert(StudentAttendance.StudentNotRegistered.selector);
+        vm.prank(otherStudent);
         attendance.markAttendance(sessionId, expiry, 1, signature);
     }
 
@@ -81,8 +81,8 @@ contract StudentAttendanceTest {
         vm.prank(student);
         attendance.markAttendance(sessionId, expiry, 1, signature);
 
-        vm.prank(student);
         vm.expectRevert(StudentAttendance.AlreadyAttended.selector);
+        vm.prank(student);
         attendance.markAttendance(sessionId, expiry, 1, signature);
     }
 
@@ -90,8 +90,8 @@ contract StudentAttendanceTest {
         uint64 expiry = uint64(block.timestamp - 1);
         bytes memory signature = _sign(INSTRUCTOR_KEY, sessionId, 1, expiry);
 
-        vm.prank(student);
         vm.expectRevert(StudentAttendance.AuthorizationExpired.selector);
+        vm.prank(student);
         attendance.markAttendance(sessionId, expiry, 1, signature);
     }
 
@@ -99,8 +99,8 @@ contract StudentAttendanceTest {
         uint64 expiry = uint64(block.timestamp + 5 minutes);
         bytes memory signature = _sign(OTHER_KEY, sessionId, 1, expiry);
 
-        vm.prank(student);
         vm.expectRevert(StudentAttendance.InvalidSignature.selector);
+        vm.prank(student);
         attendance.markAttendance(sessionId, expiry, 1, signature);
     }
 
@@ -112,8 +112,8 @@ contract StudentAttendanceTest {
         uint256 secondSessionId =
             attendance.createSession(uint64(block.timestamp - 1), sessionEnd);
 
-        vm.prank(student);
         vm.expectRevert(StudentAttendance.InvalidSignature.selector);
+        vm.prank(student);
         attendance.markAttendance(secondSessionId, expiry, 1, signatureForFirstSession);
     }
 
@@ -124,8 +124,8 @@ contract StudentAttendanceTest {
         vm.prank(instructor);
         attendance.rotateQrNonce(sessionId);
 
-        vm.prank(student);
         vm.expectRevert(StudentAttendance.InvalidQrNonce.selector);
+        vm.prank(student);
         attendance.markAttendance(sessionId, expiry, 1, oldSignature);
     }
 
@@ -134,8 +134,8 @@ contract StudentAttendanceTest {
         bytes memory sepoliaSignature = _sign(INSTRUCTOR_KEY, sessionId, 1, expiry);
 
         vm.chainId(1);
-        vm.prank(student);
         vm.expectRevert(StudentAttendance.InvalidSignature.selector);
+        vm.prank(student);
         attendance.markAttendance(sessionId, expiry, 1, sepoliaSignature);
     }
 
@@ -146,8 +146,8 @@ contract StudentAttendanceTest {
         uint64 expiry = uint64(block.timestamp + 5 minutes);
         bytes memory signature = _sign(INSTRUCTOR_KEY, sessionId, 1, expiry);
 
-        vm.prank(student);
         vm.expectRevert(StudentAttendance.SessionNotActive.selector);
+        vm.prank(student);
         attendance.markAttendance(sessionId, expiry, 1, signature);
     }
 
@@ -158,14 +158,13 @@ contract StudentAttendanceTest {
         uint64 expiry = uint64(block.timestamp + 5 minutes);
         bytes memory signature = _sign(INSTRUCTOR_KEY, sessionId, 1, expiry);
 
-        vm.prank(student);
         vm.expectRevert(StudentAttendance.StudentNotRegistered.selector);
+        vm.prank(student);
         attendance.markAttendance(sessionId, expiry, 1, signature);
     }
 
     function _sign(uint256 privateKey, uint256 id, uint64 nonce, uint64 expiry)
         private
-        view
         returns (bytes memory)
     {
         bytes32 structHash =
