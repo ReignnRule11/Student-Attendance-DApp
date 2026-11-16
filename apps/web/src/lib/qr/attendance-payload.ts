@@ -23,13 +23,13 @@ export function parseAttendanceQrPayload(raw: string): AttendanceQrPayload {
     typeof item.contractAddress !== "string" ||
     !isAddress(item.contractAddress) ||
     typeof item.sessionId !== "string" ||
-    !/^\\d+$/.test(item.sessionId) ||
+    !/^[0-9]+$/.test(item.sessionId) ||
     BigInt(item.sessionId) <= BigInt(0) ||
     typeof item.qrNonce !== "string" ||
-    !/^\\d+$/.test(item.qrNonce) ||
+    !/^[0-9]+$/.test(item.qrNonce) ||
     BigInt(item.qrNonce) <= BigInt(0) ||
     typeof item.expiresAt !== "string" ||
-    !/^\\d+$/.test(item.expiresAt) ||
+    !/^[0-9]+$/.test(item.expiresAt) ||
     BigInt(item.expiresAt) <= BigInt(0) ||
     typeof item.signature !== "string" ||
     !isHex(item.signature, { strict: true }) ||
