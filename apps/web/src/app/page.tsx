@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 const capabilities = [
   {
     number: "01",
@@ -23,10 +25,10 @@ export default function Home() {
   return (
     <main className="shell">
       <header className="topbar">
-        <a className="brand" href="/" aria-label="Student Attendance home">
+        <Link className="brand" href="/" aria-label="Student Attendance home">
           <span className="brand-mark">SA</span>
           <span>Student Attendance</span>
-        </a>
+        </Link>
         <span className="network-pill">
           <span className="status-dot" />
           Sepolia testnet target
@@ -35,13 +37,17 @@ export default function Home() {
 
       <section className="hero">
         <p className="eyebrow">DECENTRALIZED ATTENDANCE</p>
-        <h1>Attendance that is <span>verifiable.</span></h1>
+        <h1>
+          Attendance that is <span>verifiable.</span>
+        </h1>
         <p className="hero-copy">
           A wallet-based attendance workflow connecting instructor-authorized
           sessions, QR check-ins, and tamper-resistant on-chain records.
         </p>
         <div className="hero-actions">
-          <a className="primary-action" href="#workflow">Explore the workflow <span aria-hidden="true">↗</span></a>
+          <Link className="primary-action" href="#workflow">
+            Explore the workflow <span aria-hidden="true">↗</span>
+          </Link>
           <span className="phase-note">Phase 3 · Web foundation</span>
         </div>
       </section>
@@ -50,7 +56,10 @@ export default function Home() {
         <div>
           <p className="panel-label">CURRENT BUILD STATUS</p>
           <h2>Frontend foundation</h2>
-          <p className="muted">The contract baseline is merged. Wallet and QR integrations are the next implementation steps.</p>
+          <p className="muted">
+            The contract baseline is merged. Wallet and QR integrations are
+            the next implementation steps.
+          </p>
         </div>
         <div className="status-list">
           <span><i className="complete" /> Solidity contract baseline</span>
