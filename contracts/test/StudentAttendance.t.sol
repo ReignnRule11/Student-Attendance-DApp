@@ -268,6 +268,14 @@ contract StudentAttendanceTest {
         attendance.proposeAdmin(address(0));
     }
 
+    function testAdminCannotProposeItselfOrContractAsSuccessor() public {
+        vm.expectRevert(StudentAttendance.InvalidAdminProposal.selector);
+        attendance.proposeAdmin(address(this));
+
+        vm.expectRevert(StudentAttendance.InvalidAdminProposal.selector);
+        attendance.proposeAdmin(address(attendance));
+    }
+
     function testRevokedInstructorCannotUseExistingSessionQr() public {
         uint64 expiry = uint64(block.timestamp + 5 minutes);
         bytes memory signature = _sign(INSTRUCTOR_KEY, sessionId, 1, expiry);
