@@ -1,125 +1,226 @@
 # Student Attendance DApp
 
 [![Contracts CI](https://github.com/ReignnRule11/Student-Attendance-DApp/actions/workflows/contracts-ci.yml/badge.svg)](https://github.com/ReignnRule11/Student-Attendance-DApp/actions/workflows/contracts-ci.yml)
-
 [![Web CI](https://github.com/ReignnRule11/Student-Attendance-DApp/actions/workflows/web-ci.yml/badge.svg)](https://github.com/ReignnRule11/Student-Attendance-DApp/actions/workflows/web-ci.yml)
 
-A wallet-based attendance application targeting **Ethereum Sepolia**. Authorized instructors create time-bounded sessions, issue EIP-712 QR authorizations, and registered students submit attendance from their own wallets.
+A wallet-based attendance system built on **Ethereum Sepolia**. Instructors create time-bounded attendance sessions and issue signed QR authorizations. Registered students scan or enter the QR payload and submit attendance transactions using their own wallets.
 
-> **Project status:** Phases 1–8 are merged. Phase 9 adds two-step administrator handover and strict instructor-revocation enforcement. No live contract deployment, independent audit, or production-readiness claim is made.
+> **Project status:** Phases 1–9 have been merged. Sepolia deployment tooling is available, but **the contract has not been deployed**. This repository is a testnet-stage project, not an independently audited or production-ready system.
 
-## Phase 6 dashboard
+---
 
-- **Role detection:** reads the current contract admin, instructor authorization, and student registration for the connected wallet.
-- **Instructor workspace:** creates sessions, registers or revokes student wallets, loads sessions by ID, pauses/resumes sessions, and rotates QR nonces.
-- **Admin workspace:** authorizes/revokes instructors and proposes a two-step administrator handover; only the proposed wallet can accept.
-- **Student workspace:** shows the connected wallet's registration role and supports per-session attendance checks.
-- **Transaction feedback:** waits for Sepolia receipts and links submitted transactions to Sepolia Etherscan.
-- **Grounded data:** session and role information is read from the contract. The contract has no student directory or attendance enumeration method, so the UI does not fabricate student lists or attendance totals.
+## Contents
 
-All transaction controls require a connected wallet on Sepolia and a configured deployed contract address. The contract remains authoritative; frontend checks are not security boundaries.
+- [Overview](#overview)
+- [Core capabilities](#core-capabilities)
+- [How attendance works](#how-attendance-works)
+- [Architecture and technology](#architecture-and-technology)
+- [Smart-contract security model](#smart-contract-security-model)
+- [Known limitations and residual risks](#known-limitations-and-residual-risks)
+- [Repository structure](#repository-structure)
+- [Getting started](#getting-started)
+- [Configuration](#configuration)
+- [Validation and tests](#validation-and-tests)
+- [Sepolia deployment](#sepolia-deployment)
+- [Delivery progress](#delivery-progress)
+- [Contributing](#contributing)
 
-## Product workflow
+## Overview
 
-1. An instructor connects an authorized wallet on Sepolia.
-2. An instructor creates a time-bounded session through the dashboard.
-3. The instructor reads the session's current QR nonce, signs the exact EIP-712 attendance authorization, and displays the resulting QR.
-4. A registered student scans the QR or pastes its payload, then confirms the attendance transaction.
-5. The contract enforces registration, session state, signature, expiry, nonce validity, and one attendance per student/session.
+The application uses wallet identity and smart-contract rules to record attendance without placing student names, email addresses, or matriculation numbers on-chain.
 
-The QR is reusable by multiple students until expiry or nonce rotation. It is not a single-use token; the contract enforces one attendance per student per session.
+The contract is the source of truth for instructor permissions, student registration, session state, QR authorization, and attendance records. The web application provides the user interface for those contract interactions.
 
-## Architecture
+### Intended roles
 
-- **Web:** Next.js App Router, TypeScript, responsive CSS.
-- **Wallet and chain client:** wagmi and viem, injected wallet connection, Sepolia chain enforcement.
-- **QR generation:** `qrcode.react`.
-- **Camera scanning:** `html5-qrcode`; camera access begins only after the student explicitly starts scanning. Manual payload entry is also available.
-- **Contract access:** typed ABI matching `contracts/src/StudentAttendance.sol`.
-- **Smart contracts:** Solidity and Foundry.
-- **CI:** GitHub Actions for contract and frontend checks.
+| Role | Main responsibilities |
+|---|---|
+| Administrator | Authorize and revoke instructors; propose and accept administrator handover |
+| Instructor | Create sessions, register or revoke student wallets, manage owned sessions, issue QR authorizations |
+| Student | Connect a wallet, scan or enter an authorization, submit attendance, check personal attendance status |
 
-### Trust boundaries and limitations
+Role-specific controls are shown based on contract state. All state-changing operations require a connected wallet on Sepolia and a configured contract address.
 
-A QR code is a bearer artifact: someone may photograph or share it. Short expiry and instructor-controlled nonce rotation reduce this risk, but QR scanning alone **does not prove physical presence**.
+## Core capabilities
 
-Revoking an instructor invalidates new attendance for their sessions while preserving already-recorded attendance. The contract does not expose an enumerable student roster or an attendance count. The dashboard therefore supports direct wallet and session lookups rather than implying a complete roster or total.
+- **Wallet connection:** connect an injected EVM wallet and enforce the Sepolia network.
+- **Instructor authorization:** administrator-controlled instructor access.
+- **Student registration:** instructors register or revoke student wallet addresses.
+- **Session management:** create time-bounded sessions, pause or resume sessions, and rotate QR nonces.
+- **EIP-712 authorization:** instructors sign typed attendance messages bound to the chain, contract, session, nonce, and expiry.
+- **QR attendance:** generate QR codes for students to scan; manual payload entry is available as a camera alternative.
+- **On-chain validation:** the contract checks instructor authorization, student registration, session state and timing, signature validity, nonce, and duplicate attendance.
+- **Transaction feedback:** the interface waits for transaction receipts and provides Sepolia Etherscan links.
+- **Governance safeguards:** administrator handover requires a proposal followed by acceptance from the nominated wallet; instructor revocation invalidates new attendance for that instructor's sessions.
+
+## How attendance works
+
+1. The instructor connects an authorized wallet on Sepolia.
+2. The instructor creates a session with a start and end time.
+3. The application reads the session's current QR nonce and prepares an EIP-712 authorization.
+4. The instructor signs the authorization with their wallet. The signed payload is encoded into a QR code.
+5. The registered student scans the QR code or enters its payload manually.
+6. The student reviews and submits the attendance transaction.
+7. The contract validates the authorization and records attendance for that student and session.
+
+A QR authorization can be used by multiple registered students until it expires or its nonce is rotated. Duplicate attendance is prevented per student per session; the QR itself is deliberately not consumed by the first student.
+
+## Architecture and technology
+
+| Layer | Technology | Responsibility |
+|---|---|---|
+| Web application | Next.js App Router, React, TypeScript | User interface and role-based workflows |
+| Wallet integration | wagmi, viem | Wallet connection, chain checks, typed-data signing, contract reads and writes |
+| Smart contracts | Solidity, Foundry | Authorization rules and attendance state |
+| QR generation | qrcode.react | Render signed attendance payloads |
+| QR scanning | html5-qrcode | Camera scanning with manual-entry fallback |
+| Automation | GitHub Actions | Contract and web validation workflows |
+| Network | Ethereum Sepolia | Testnet execution |
+
+### Application flow
+
+```text
+Instructor wallet
+      |
+      v
+Create session -> EIP-712 signature -> QR payload
+                                      |
+                                      v
+Student wallet -> Scan / paste -> Contract validation
+                                      |
+                                      v
+                              Attendance recorded
+                                      |
+                                      v
+                              Transaction receipt
+```
+
+## Smart-contract security model
+
+The contract is the enforcement boundary. Frontend validation improves usability but is not a security control.
+
+### Attendance authorization
+
+The EIP-712 domain uses:
+
+- Name: `StudentAttendance`
+- Version: `1`
+- Chain ID: the active deployment chain
+- Verifying contract: the deployed attendance contract
+
+The signed message contains:
+
+- `sessionId` — the attendance session identifier
+- `qrNonce` — the session's current QR nonce
+- `expiresAt` — the authorization expiry timestamp
+
+The contract also checks that the signing instructor remains authorized, the student is registered, the session is active and within its time window, the nonce is current, and that the student has not already attended that session.
+
+### Governance and revocation
+
+- The current administrator nominates a successor using `proposeAdmin`.
+- Only the nominated wallet can complete the transfer using `acceptAdmin`.
+- The accepted administrator is granted instructor access.
+- The previous administrator retains instructor access until separately revoked.
+- Revoking an instructor prevents new attendance submissions for that instructor's sessions and prevents the revoked instructor from managing those sessions.
+- Previously recorded attendance is not erased or rewritten.
+
+Administrator handover is **not** key recovery. If the current administrator loses access before nominating a successor, the contract does not provide a recovery mechanism.
+
+### Privacy principles
+
+- Do not store student names, emails, matriculation numbers, or other direct identifiers on-chain.
+- Never request or store wallet private keys or seed phrases.
+- Wallet addresses and transaction histories are public and pseudonymous, not anonymous.
+- Attendance records are append-only in the current contract; there is no silent delete or edit operation.
+
+## Known limitations and residual risks
+
+- **QR sharing:** a student can photograph or forward a QR code. Expiry and nonce rotation reduce exposure but do not prove physical presence.
+- **No physical-presence attestation:** scanning a QR code alone cannot establish that a student is physically in the classroom.
+- **Global role scope:** instructor and student permissions are not currently scoped to an institution, department, course, or class.
+- **No enumerable roster:** the contract does not expose a complete student directory or attendance enumeration/count. The dashboard therefore supports direct wallet and session lookups rather than inventing roster data or totals.
+- **Administrator trust:** the administrator remains a privileged trust anchor. Multisig administration should be considered before any production deployment.
+- **External assurance:** an independent smart-contract audit, browser-level integration testing, and dependency advisory triage remain outstanding.
+
+These limitations must be considered before using the system for consequential academic records.
 
 ## Repository structure
 
 ```text
 .
-├── .github/workflows/
-│   ├── contracts-ci.yml
-│   └── web-ci.yml
-├── apps/web/
-│   ├── src/
-│   │   ├── app/
-│   │   │   ├── globals.css
-│   │   │   ├── layout.tsx
-│   │   │   └── page.tsx
-│   │   ├── components/
-│   │   │   ├── AuthorizationSigner.tsx
-│   │   │   ├── RoleDashboard.tsx
-│   │   │   ├── StudentAttendanceScanner.tsx
-│   │   │   └── WalletPanel.tsx
-│   │   └── lib/
-│   │       ├── contract/abi.ts
-│   │       ├── qr/attendance-payload.ts
-│   │       └── wallet/config.ts
-│   ├── eslint.config.mjs
-│   ├── next.config.ts
-│   ├── package.json
-│   └── tsconfig.json
+├── .github/
+│   └── workflows/
+│       ├── contracts-ci.yml
+│       └── web-ci.yml
+├── apps/
+│   └── web/
+│       ├── src/
+│       │   ├── app/
+│       │   │   ├── globals.css
+│       │   │   ├── layout.tsx
+│       │   │   ├── page.tsx
+│       │   │   └── providers.tsx
+│       │   ├── components/
+│       │   │   ├── AuthorizationSigner.tsx
+│       │   │   ├── RoleDashboard.tsx
+│       │   │   ├── StudentAttendanceScanner.tsx
+│       │   │   └── WalletPanel.tsx
+│       │   └── lib/
+│       │       ├── contract/abi.ts
+│       │       ├── qr/attendance-payload.ts
+│       │       └── wallet/config.ts
+│       ├── package.json
+│       └── tsconfig.json
 ├── contracts/
-│   ├── script/DeployStudentAttendance.s.sol
-│   ├── src/StudentAttendance.sol
-│   ├── test/StudentAttendance.t.sol
-│   ├── test/StudentAttendanceInvariant.t.sol
+│   ├── script/
+│   │   └── DeployStudentAttendance.s.sol
+│   ├── src/
+│   │   └── StudentAttendance.sol
+│   ├── test/
+│   │   ├── StudentAttendance.t.sol
+│   │   └── StudentAttendanceInvariant.t.sol
 │   └── foundry.toml
 ├── docs/
 │   ├── DEPLOYMENT.md
-│   ├── SECURITY.md
-│   └── PHASE-7-SECURITY-VALIDATION.md
+│   ├── PHASE-7-SECURITY-VALIDATION.md
+│   └── SECURITY.md
 ├── .env.example
 └── README.md
 ```
 
-## Privacy and security principles
+## Getting started
 
-- Do not put student names, emails, matriculation numbers, or other direct identifiers on-chain.
-- Never request, collect, or store wallet private keys or seed phrases.
-- Enforce instructor-only session creation and registration in the contract.
-- Enforce registered-student-only attendance and one attendance record per student per session.
-- Reject expired, forged, wrong-session, wrong-chain, and replayed authorizations.
-- Do not provide an administrative path to silently erase or rewrite attendance history.
-- Treat QR codes as shareable bearer artifacts, not proof of physical presence.
-- Remember that wallet addresses and transaction histories are public and pseudonymous, not anonymous.
+### Prerequisites
 
-## Delivery phases
+- Node.js and npm
+- Foundry (for smart-contract development and tests)
+- An injected EVM wallet for browser-based wallet interaction
+- Sepolia test ETH for testnet transactions
 
-1. Architecture, threat model, and repository foundation — **complete**.
-2. Attendance contract, EIP-712 verification, and adversarial Foundry tests — **merged; CI passed**.
-3. Next.js web foundation and frontend CI — **merged; CI passed**.
-4. Sepolia wallet connection and EIP-712 signing foundation — **merged; CI passed**.
-5. Instructor QR generation, student camera/manual scanning, and attendance transaction flow — **merged**.
-6. Instructor/student dashboards, session creation, student registration, and session controls — **merged; post-merge web CI passed**.
-7. Fuzz, invariant, and security validation — **merged; formatting, build, tests, and 1,000-run fuzz CI passed**.
-8. Sepolia deployment tooling and controlled deployment runbook — **merged; no live deployment claimed**.
-9. Governance hardening, two-step admin handover, and revoked-instructor session invalidation — **in progress**.
+### Install and run the web application
 
-## Development
+From the repository root:
 
 ```bash
 cd apps/web
 npm install
 npm run dev
+```
+
+The development server is available at `http://localhost:3000`.
+
+Useful web checks:
+
+```bash
 npm run lint
 npm run typecheck
 npm run build
 ```
 
-Contract commands (from the repository root):
+### Build and test the contracts
+
+From the repository root:
 
 ```bash
 cd contracts
@@ -129,8 +230,93 @@ forge test
 forge test --fuzz-runs 1000
 ```
 
-Copy `.env.example` to `apps/web/.env.local` for local frontend configuration. Set `NEXT_PUBLIC_CONTRACT_ADDRESS` only after a verified Sepolia deployment; optionally provide `NEXT_PUBLIC_SEPOLIA_RPC_URL`. Never commit private keys, seed phrases, RPC credentials, or other secrets.
+## Configuration
 
-## Current implementation status
+Copy the example environment file and configure the frontend locally:
 
-Phase 6 provides role-aware dashboards and contract-backed management workflows. Phase 7 adds fuzz and stateful invariant tests; see `docs/PHASE-7-SECURITY-VALIDATION.md`. Phase 8 adds a Sepolia-only Foundry deployment script and a verification/post-deployment checklist; Phase 9 hardens administrator handover and instructor revocation. Browser-level integration tests, dependency advisory triage, and independent audit remain outstanding. No deployment or live transaction is claimed.
+```bash
+cp .env.example apps/web/.env.local
+```
+
+The frontend uses public configuration values such as:
+
+| Variable | Purpose |
+|---|---|
+| `NEXT_PUBLIC_CHAIN_ID` | Expected network; Sepolia is `11155111` |
+| `NEXT_PUBLIC_CONTRACT_ADDRESS` | Deployed attendance contract address |
+| `NEXT_PUBLIC_SEPOLIA_RPC_URL` | Optional browser-accessible Sepolia RPC endpoint |
+| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | Optional WalletConnect project configuration placeholder |
+
+The deployment script uses server-side/deployment environment values documented in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
+Do not commit `.env.local`, private keys, seed phrases, RPC credentials, or other secrets. Never paste a private key or seed phrase into chat or a frontend environment variable.
+
+**Important:** `NEXT_PUBLIC_CONTRACT_ADDRESS` is intentionally not populated with a live address. Set it only after a successful Sepolia deployment and independent verification.
+
+## Validation and tests
+
+GitHub Actions runs separate workflows for:
+
+- Solidity formatting, compilation, Foundry tests, fuzz tests, and invariant tests.
+- Web dependency installation, ESLint, TypeScript type-checking, and Next.js production build.
+
+Workflow results:
+
+- [Contracts CI](https://github.com/ReignnRule11/Student-Attendance-DApp/actions/workflows/contracts-ci.yml)
+- [Web CI](https://github.com/ReignnRule11/Student-Attendance-DApp/actions/workflows/web-ci.yml)
+
+Passing CI demonstrates that the configured automated checks passed for a commit. It is not a substitute for an independent security audit or live end-to-end testing.
+
+## Sepolia deployment
+
+A Sepolia-only Foundry deployment script and controlled deployment runbook are included.
+
+**No live deployment is currently claimed.** Before broadcasting a deployment transaction:
+
+1. Review [docs/SECURITY.md](docs/SECURITY.md) and [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+2. Confirm the deployment script, contract behavior, and governance assumptions.
+3. Use a dedicated wallet funded only with Sepolia test ETH.
+4. Verify the RPC endpoint reports chain ID `11155111`.
+5. Confirm the expected deployer address before broadcasting.
+6. Verify the deployed source and address on Sepolia Etherscan.
+7. Run the documented post-deployment checks before configuring the frontend.
+
+The deployer becomes the initial administrator. Protect that wallet carefully; administrator handover is possible only while the current administrator can authorize a proposal.
+
+## Delivery progress
+
+| Phase | Scope | Status |
+|---:|---|---|
+| 1 | Architecture, threat model, repository foundation | Merged |
+| 2 | Attendance contract, EIP-712 verification, security tests | Merged |
+| 3 | Next.js application foundation and web CI | Merged |
+| 4 | Sepolia wallet connection and typed-data signing | Merged |
+| 5 | QR generation, scanning, and attendance transaction flow | Merged |
+| 6 | Role-aware dashboards and contract-backed management | Merged |
+| 7 | Fuzz, invariant, and security validation | Merged |
+| 8 | Sepolia deployment tooling and deployment runbook | Merged |
+| 9 | Two-step admin handover and instructor-revocation enforcement | Merged |
+
+### Remaining release work
+
+- Complete browser-level and Anvil end-to-end integration tests.
+- Triage and resolve dependency security advisories.
+- Review operational controls and consider multisig administration.
+- Obtain an independent smart-contract security audit.
+- Perform a controlled Sepolia deployment and verify the deployed contract.
+- Configure and test the frontend against the verified deployment.
+
+## Contributing
+
+Contributions should preserve the contract as the source of truth and maintain the privacy and security principles above.
+
+1. Create a focused branch for the change.
+2. Add or update tests for contract and application behavior.
+3. Run the relevant formatting, test, lint, type-check, and build commands.
+4. Describe security implications and known limitations in the pull request.
+
+Avoid introducing mock contract behavior, fabricated attendance data, or claims of deployment and audit that are not supported by evidence.
+
+---
+
+For implementation details and operational procedures, see the `docs/` directory.
