@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {StudentAttendance} from "../src/StudentAttendance.sol";
+import { StudentAttendance } from "../src/StudentAttendance.sol";
 
 interface Vm {
     function addr(uint256 privateKey) external returns (address);
@@ -110,8 +110,7 @@ contract StudentAttendanceTest {
         bytes memory signatureForFirstSession = _sign(INSTRUCTOR_KEY, sessionId, 1, expiry);
 
         vm.prank(instructor);
-        uint256 secondSessionId =
-            attendance.createSession(uint64(block.timestamp - 1), sessionEnd);
+        uint256 secondSessionId = attendance.createSession(uint64(block.timestamp - 1), sessionEnd);
 
         vm.expectRevert(StudentAttendance.InvalidSignature.selector);
         vm.prank(student);
@@ -170,9 +169,8 @@ contract StudentAttendanceTest {
     {
         bytes32 structHash =
             keccak256(abi.encode(ATTENDANCE_TYPEHASH, id, uint256(nonce), uint256(expiry)));
-        bytes32 digest = keccak256(
-            abi.encodePacked("\x19\x01", attendance.domainSeparator(), structHash)
-        );
+        bytes32 digest =
+            keccak256(abi.encodePacked("\x19\x01", attendance.domainSeparator(), structHash));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
         return abi.encodePacked(r, s, v);
     }
