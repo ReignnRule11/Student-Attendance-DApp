@@ -69,11 +69,13 @@ The contract does not expose an enumerable student roster or an attendance count
 │   └── tsconfig.json
 ├── contracts/
 │   ├── src/StudentAttendance.sol
-│   ├── test/StudentAttendance.t.sol\n│   ├── test/StudentAttendanceInvariant.t.sol
+│   ├── test/StudentAttendance.t.sol
+│   ├── test/StudentAttendanceInvariant.t.sol\n│   ├── test/StudentAttendanceInvariant.t.sol
 │   └── foundry.toml
 ├── docs/
 │   ├── DEPLOYMENT.md
-│   └── SECURITY.md
+│   ├── SECURITY.md
+│   └── PHASE-7-SECURITY-VALIDATION.md
 ├── .env.example
 └── README.md
 ```
@@ -96,8 +98,8 @@ The contract does not expose an enumerable student roster or an attendance count
 3. Next.js web foundation and frontend CI — **merged; CI passed**.
 4. Sepolia wallet connection and EIP-712 signing foundation — **merged; CI passed**.
 5. Instructor QR generation, student camera/manual scanning, and attendance transaction flow — **merged**.
-6. Instructor/student dashboards, session creation, student registration, and session controls — **implementation under review**.
-7. End-to-end, fuzz, invariant, and security validation.
+6. Instructor/student dashboards, session creation, student registration, and session controls — **merged; post-merge web CI passed**.
+7. Fuzz, invariant, and security validation — **implementation under review**.
 8. Sepolia deployment, explorer verification, and deployment documentation.
 
 ## Development
