@@ -32,6 +32,8 @@ export function RoleDashboard() {
   const onSepolia = chainId === sepolia.id;
 
   const [adminAddress, setAdminAddress] = useState("");
+  const [pendingAdminAddress, setPendingAdminAddress] = useState("");
+  const [newAdminAddress, setNewAdminAddress] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
   const [isInstructor, setIsInstructor] = useState(false);
   const [isStudent, setIsStudent] = useState(false);
@@ -60,12 +62,14 @@ export function RoleDashboard() {
     }
     setRolesLoading(true);
     try {
-      const [admin, instructor, student] = await Promise.all([
+      const [admin, pendingAdmin, instructor, student] = await Promise.all([
         publicClient.readContract({ address: contractAddress as `0x${string}`, abi: studentAttendanceAbi, functionName: "admin" }),
+        publicClient.readContract({ address: contractAddress as `0x${string}`, abi: studentAttendanceAbi, functionName: "pendingAdmin" }),
         publicClient.readContract({ address: contractAddress as `0x${string}`, abi: studentAttendanceAbi, functionName: "instructors", args: [address] }),
         publicClient.readContract({ address: contractAddress as `0x${string}`, abi: studentAttendanceAbi, functionName: "registeredStudents", args: [address] }),
       ]);
       setAdminAddress(admin);
+      setPendingAdminAddress(pendingAdmin);
       setIsAdmin(admin.toLowerCase() === address.toLowerCase());
       setIsInstructor(instructor);
       setIsStudent(student);
@@ -78,7 +82,7 @@ export function RoleDashboard() {
 
   useEffect(() => { void loadRoles(); }, [loadRoles]);
 
-  const sendTransaction = async (functionName: "registerStudent" | "revokeStudent" | "authorizeInstructor" | "revokeInstructor" | "setSessionActive" | "rotateQrNonce", args: readonly unknown[], successMessage: string) => {
+  const sendTransaction = async (functionName: "registerStudent" | "revokeStudent" | "authorizeInstructor" | "revokeInstructor" | "setSessionActive" | "rotateQrNonce" | "proposeAdmin" | "acceptAdmin", args: readonly unknown[], successMessage: string) => {
     if (!address || !contractAddress || !configured || !publicClient || !onSepolia) {
       setError("Connect a wallet on Sepolia and configure the deployed contract address.");
       return;
@@ -243,6 +247,15 @@ export function RoleDashboard() {
             {rolesLoading && <span className="muted">Refreshing roles…</span>}
           </div>
           {isAdmin && adminAddress && <p className="muted">Contract administrator: {shortAddress(adminAddress)}</p>}
+          {pendingAdminAddress !== "0x0000000000000000000000000000000000000000" && <p className="notice-message dashboard-notice">Pending administrator: {shortAddress(pendingAdminAddress)}</p>}
+          {address && pendingAdminAddress.toLowerCase() === address.toLowerCase() && (
+            <article className="dashboard-card">
+              <p className="panel-label">ADMIN · TRANSFER ACCEPTANCE</p>
+              <h3>Accept administrator role</h3>
+              <p className="muted">Accepting transfers administrator authority to this wallet. The previous administrator loses admin privileges.</p>
+              <button className="primary-action" onClick={() => void sendTransaction("acceptAdmin", [], "Administrator transfer accepted.")} disabled={isPending}>Accept admin transfer</button>
+            </article>
+          )}
 
           {(isInstructor || isAdmin) && (
             <div className="dashboard-grid">
@@ -298,6 +311,16 @@ export function RoleDashboard() {
 
               {isAdmin && (
                 <article className="dashboard-card">
+                  <p className="panel-label">ADMIN · GOVERNANCE</p>
+                  <h3>Propose administrator transfer</h3>
+                  <label>New administrator wallet<input value={newAdminAddress} onChange={(event) => setNewAdminAddress(event.target.value)} placeholder="0x…" spellCheck={false} /></label>
+                  <button className="secondary-action" onClick={() => isAddress(newAdminAddress) ? void sendTransaction("proposeAdmin", [newAdminAddress], "Administrator transfer proposed. The new wallet must accept it.") : setError("Enter a valid administrator wallet address.")} disabled={isPending || !newAdminAddress}>Propose transfer</button>
+                  <p className="notice-message">Two-step transfer: the proposed wallet must connect and accept. Until acceptance, the current administrator remains in control.</p>
+                </article>
+              )}
+
+              {isAdmin && (
+                <article className="dashboard-card">
                   <p className="panel-label">ADMIN · INSTRUCTOR ACCESS</p>
                   <h3>Authorize or revoke an instructor</h3>
                   <label>Instructor wallet address<input value={instructorAddress} onChange={(event) => setInstructorAddress(event.target.value)} placeholder="0x…" spellCheck={false} /></label>
@@ -305,7 +328,7 @@ export function RoleDashboard() {
                     <button className="primary-action" onClick={() => isAddress(instructorAddress) ? void sendTransaction("authorizeInstructor", [instructorAddress], "Instructor authorized.") : setError("Enter a valid instructor wallet address.")} disabled={isPending || !instructorAddress}>Authorize</button>
                     <button className="secondary-action" onClick={() => isAddress(instructorAddress) ? void sendTransaction("revokeInstructor", [instructorAddress], "Instructor revoked.") : setError("Enter a valid instructor wallet address.")} disabled={isPending || !instructorAddress}>Revoke</button>
                   </div>
-                  <p className="notice-message">The contract administrator cannot revoke its own instructor access. Revoking an instructor does not erase their historical sessions or attendance.</p>
+                  <p className="notice-message">The contract administrator cannot revoke its own instructor access. Revoking an instructor blocks new attendance for their sessions and prevents them from managing those sessions; historical attendance remains unchanged.</p>
                 </article>
               )}
             </div>
