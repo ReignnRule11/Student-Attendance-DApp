@@ -70,7 +70,7 @@ The contract does not expose an enumerable student roster or an attendance count
 ├── contracts/
 │   ├── src/StudentAttendance.sol
 │   ├── test/StudentAttendance.t.sol
-│   ├── test/StudentAttendanceInvariant.t.sol\n│   ├── test/StudentAttendanceInvariant.t.sol
+│   ├── test/StudentAttendanceInvariant.t.sol
 │   └── foundry.toml
 ├── docs/
 │   ├── DEPLOYMENT.md
