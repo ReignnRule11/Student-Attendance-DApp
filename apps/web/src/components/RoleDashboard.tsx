@@ -42,10 +42,11 @@ export function RoleDashboard() {
   const [instructorAddress, setInstructorAddress] = useState("");
   const [sessionIdInput, setSessionIdInput] = useState("");
   const [session, setSession] = useState<SessionView | null>(null);
-  const [sessionOwner, setSessionOwner] = useState(false);
   const [studentLookupAddress, setStudentLookupAddress] = useState("");
   const [lookupRegistered, setLookupRegistered] = useState<boolean | null>(null);
   const [lookupAttended, setLookupAttended] = useState<boolean | null>(null);
+  const [studentSessionId, setStudentSessionId] = useState("");
+  const [ownAttendance, setOwnAttendance] = useState<boolean | null>(null);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [lastTransaction, setLastTransaction] = useState("");
@@ -122,7 +123,6 @@ export function RoleDashboard() {
         throw new Error("No session exists with that ID.");
       }
       setSession({ instructor: result[0], startsAt: result[1], endsAt: result[2], qrNonce: result[3], active: result[4] });
-      setSessionOwner(Boolean(address && (isAdmin || result[0].toLowerCase() === address.toLowerCase())));
       setStatus("Session loaded from the Sepolia contract.");
     } catch (readError) {
       setError(readError instanceof Error ? readError.message : "Could not load this session.");
@@ -197,6 +197,26 @@ export function RoleDashboard() {
       setStatus(attended === null ? "Registration status loaded. Enter a session ID to check attendance." : "Student registration and attendance status loaded.");
     } catch (readError) {
       setError(readError instanceof Error ? readError.message : "Could not check this student.");
+    }
+  };
+
+  const checkOwnAttendance = async () => {
+    if (!address || !publicClient || !contractAddress || !configured || !/^[1-9][0-9]*$/.test(studentSessionId)) {
+      setError("Enter a valid session ID to check your attendance.");
+      return;
+    }
+    setError("");
+    try {
+      const attended = await publicClient.readContract({
+        address: contractAddress as `0x${string}`,
+        abi: studentAttendanceAbi,
+        functionName: "hasAttended",
+        args: [BigInt(studentSessionId), address],
+      });
+      setOwnAttendance(attended);
+      setStatus(`Your attendance status for session #${studentSessionId} was loaded from Sepolia.`);
+    } catch (readError) {
+      setError(readError instanceof Error ? readError.message : "Could not load your attendance status.");
     }
   };
 
@@ -295,7 +315,10 @@ export function RoleDashboard() {
             <article className="dashboard-card student-summary">
               <p className="panel-label">STUDENT · PERSONAL STATUS</p>
               <h3>Your wallet is registered</h3>
-              <p className="muted">Your attendance records are checked per session. Enter a session ID above in the scanner workflow to see whether your check-in has been recorded.</p>
+              <p className="muted">Check your own recorded attendance for any session. The result is read directly from the contract.</p>
+              <label>Session ID<input inputMode="numeric" value={studentSessionId} onChange={(event) => setStudentSessionId(event.target.value)} placeholder="e.g. 1" /></label>
+              <button className="secondary-action" onClick={() => void checkOwnAttendance()} disabled={!studentSessionId.trim()}>Check my attendance</button>
+              {ownAttendance !== null && <p className="status-message">Attendance: {ownAttendance ? "Recorded" : "Not recorded"}</p>}
             </article>
           )}
 
