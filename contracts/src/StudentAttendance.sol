@@ -99,6 +99,10 @@ contract StudentAttendance {
         address previousAdmin = admin;
         admin = msg.sender;
         pendingAdmin = address(0);
+        if (!instructors[msg.sender]) {
+            instructors[msg.sender] = true;
+            emit InstructorUpdated(msg.sender, true);
+        }
         emit AdminTransferred(previousAdmin, msg.sender);
     }
 
