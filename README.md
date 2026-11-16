@@ -2,7 +2,7 @@
 
 A full-stack, wallet-based attendance application targeting **Ethereum Sepolia**. Instructors create attendance sessions and display short-lived QR codes; registered students scan a code and submit an on-chain attendance transaction with their connected wallet.
 
-> **Project status:** Phase 1 and Phase 2 are merged. Phase 3 web foundation is under review. No contract deployment or production-readiness claim is made.
+> **Project status:** Phases 1–3 are merged. Phase 4 wallet and EIP-712 signing integration is in progress. No contract deployment or production-readiness claim is made.
 
 ## Product workflow
 
@@ -15,7 +15,7 @@ A full-stack, wallet-based attendance application targeting **Ethereum Sepolia**
 ## Architecture
 
 - **Web:** Next.js App Router, TypeScript, responsive CSS.
-- **Wallet and chain client:** planned wagmi and viem integration; Ethereum Sepolia.
+- **Wallet and chain client:** wagmi and viem, injected wallet connection, and Sepolia chain enforcement (Phase 4 implementation).
 - **Smart contracts:** Solidity, Foundry, OpenZeppelin cryptographic utilities.
 - **QR:** planned browser camera scanning and QR generation in the web client.
 - **Verification:** contract-enforced authorization and replay protection; UI checks are never treated as security boundaries.
@@ -124,8 +124,8 @@ forge build
 forge test
 ```
 
-Copy `.env.example` to a local environment file when configuration is introduced. Never commit private keys, seed phrases, RPC credentials, or other secrets.
+Copy `.env.example` to `apps/web/.env.local` for local frontend configuration. Set `NEXT_PUBLIC_CONTRACT_ADDRESS` only after a verified Sepolia deployment; optionally provide `NEXT_PUBLIC_SEPOLIA_RPC_URL`. Never commit private keys, seed phrases, RPC credentials, or other secrets.
 
 ## Current implementation status
 
-The frontend foundation currently provides a responsive landing/dashboard shell and automated lint, TypeScript, and production-build checks. Wallet connection, QR generation/scanning, a deployed contract address, and live Sepolia transactions are not implemented in this phase. Features and test results will be reported as complete only after implementation and verification.
+The frontend currently provides a responsive landing page, injected-wallet connection, Sepolia network switching, and an EIP-712 authorization signing interface. Signing requires `NEXT_PUBLIC_CONTRACT_ADDRESS` to contain the deployed contract address. No QR generation/scanning, contract write transactions, deployed address, or live Sepolia transaction is claimed yet. Features and test results will be reported as complete only after implementation and verification.
