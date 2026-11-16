@@ -76,8 +76,7 @@ A QR code is a bearer artifact: someone may photograph or share it. Short expiry
 │   └── foundry.toml
 ├── docs/
 │   ├── DEPLOYMENT.md
-│   ├── SECURITY.md
-│   └── . . .
+│   └── SECURITY.md
 ├── .env.example
 └── README.md
 ```
