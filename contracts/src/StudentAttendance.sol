@@ -17,7 +17,8 @@ contract StudentAttendance {
     bytes32 private constant ATTENDANCE_TYPEHASH =
         keccak256("AttendanceAuthorization(uint256 sessionId,uint256 qrNonce,uint256 expiresAt)");
 
-    address public immutable admin;
+    address public admin;
+    address public pendingAdmin;
     uint256 public nextSessionId = 1;
 
     mapping(address => bool) public instructors;
@@ -46,8 +47,11 @@ contract StudentAttendance {
     error AuthorizationExpired();
     error InvalidQrNonce();
     error InvalidSignature();
+    error NoPendingAdmin();
 
     event InstructorUpdated(address indexed instructor, bool authorized);
+    event AdminTransferProposed(address indexed currentAdmin, address indexed proposedAdmin);
+    event AdminTransferred(address indexed previousAdmin, address indexed newAdmin);
     event StudentUpdated(address indexed student, bool registered, address indexed updatedBy);
     event SessionCreated(
         uint256 indexed sessionId,
@@ -81,7 +85,24 @@ contract StudentAttendance {
         emit InstructorUpdated(msg.sender, true);
     }
 
-    /// @notice Grant instructor privileges. Only the immutable deployer admin may do this.
+    /// @notice Propose a two-step administrator transfer.
+    function proposeAdmin(address proposedAdmin) external onlyAdmin {
+        if (proposedAdmin == address(0)) revert ZeroAddress();
+        if (proposedAdmin == admin) revert AlreadyAuthorized();
+        pendingAdmin = proposedAdmin;
+        emit AdminTransferProposed(admin, proposedAdmin);
+    }
+
+    /// @notice Accept administrator privileges as the pending administrator.
+    function acceptAdmin() external {
+        if (msg.sender != pendingAdmin || pendingAdmin == address(0)) revert NoPendingAdmin();
+        address previousAdmin = admin;
+        admin = msg.sender;
+        pendingAdmin = address(0);
+        emit AdminTransferred(previousAdmin, msg.sender);
+    }
+
+    /// @notice Grant instructor privileges. Only the current admin may do this.
     function authorizeInstructor(address instructor) external onlyAdmin {
         if (instructor == address(0)) revert ZeroAddress();
         if (instructors[instructor]) revert AlreadyAuthorized();
@@ -89,7 +110,7 @@ contract StudentAttendance {
         emit InstructorUpdated(instructor, true);
     }
 
-    /// @notice Revoke instructor privileges. Existing attendance remains unchanged.
+    /// @notice Revoke instructor privileges. Their active sessions become unusable for new attendance.
     function revokeInstructor(address instructor) external onlyAdmin {
         if (!instructors[instructor] || instructor == admin) revert NotAuthorized();
         instructors[instructor] = false;
@@ -134,7 +155,9 @@ contract StudentAttendance {
     function setSessionActive(uint256 sessionId, bool active) external {
         Session storage session = sessions[sessionId];
         if (session.instructor == address(0)) revert InvalidSession();
-        if (msg.sender != admin && msg.sender != session.instructor) revert Unauthorized();
+        if (msg.sender != admin && (msg.sender != session.instructor || !instructors[msg.sender])) {
+            revert Unauthorized();
+        }
         session.active = active;
         emit SessionStatusUpdated(sessionId, active);
     }
@@ -143,7 +166,9 @@ contract StudentAttendance {
     function rotateQrNonce(uint256 sessionId) external {
         Session storage session = sessions[sessionId];
         if (session.instructor == address(0)) revert InvalidSession();
-        if (msg.sender != admin && msg.sender != session.instructor) revert Unauthorized();
+        if (msg.sender != admin && (msg.sender != session.instructor || !instructors[msg.sender])) {
+            revert Unauthorized();
+        }
         if (session.qrNonce == type(uint64).max) revert InvalidQrNonce();
         unchecked {
             session.qrNonce += 1;
@@ -164,6 +189,7 @@ contract StudentAttendance {
 
         Session storage session = sessions[sessionId];
         if (session.instructor == address(0)) revert InvalidSession();
+        if (!instructors[session.instructor]) revert Unauthorized();
         if (!session.active) revert SessionNotActive();
         if (block.timestamp < session.startsAt || block.timestamp >= session.endsAt) {
             revert SessionNotActive();
