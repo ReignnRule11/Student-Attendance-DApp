@@ -257,6 +257,7 @@ contract StudentAttendanceTest {
         attendance.acceptAdmin();
 
         require(attendance.admin() == proposed, "admin transfer failed");
+        require(attendance.instructors(proposed), "new admin lacks instructor access");
         require(attendance.pendingAdmin() == address(0), "pending admin not cleared");
 
         vm.expectRevert(StudentAttendance.Unauthorized.selector);
