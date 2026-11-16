@@ -1,17 +1,27 @@
-# Deployment guide
+# Sepolia deployment guide
 
-## Current status
+## Deployment status
 
-The contract is intended for Ethereum Sepolia. It has not been deployed by this repository setup. Do not publish an address until a deployment transaction has succeeded and the resulting bytecode has been verified.
+The repository contains a Sepolia-only deployment script. **No live deployment is performed by CI or by opening this pull request.** Do not configure the frontend contract address until a deployment transaction has succeeded and the deployed bytecode has been verified.
+
+## Release gates before using a real deployment wallet
+
+- Review the immutable-admin design. The deployer becomes the permanent contract admin; the contract has no admin transfer or recovery function.
+- Review the documented instructor-revocation limitation: a revoked instructor can still manage sessions they created, and their signatures remain valid for those sessions.
+- Complete dependency advisory triage and browser/Anvil integration testing before treating the application as production-ready.
+- Use a dedicated Sepolia-only deployer wallet. Fund it only with test ETH and keep its private key out of source control, chat, frontend variables, and shell history.
+- Confirm the RPC endpoint reports chain ID `11155111` and independently confirm the deployer address before broadcasting.
+
+These are testnet deployment gates, not a claim that the contract has been independently audited.
 
 ## Prerequisites
 
-- Foundry installed.
+- Foundry installed and available on PATH.
 - A Sepolia RPC endpoint.
-- A dedicated Sepolia deployer wallet funded with test ETH.
-- A block-explorer API key if explorer verification is desired.
+- A dedicated deployer wallet funded with Sepolia test ETH.
+- An Etherscan API key for source verification.
 
-## Local validation
+## Validate first
 
 From the repository root:
 
@@ -20,28 +30,68 @@ cd contracts
 forge fmt --check
 forge build --sizes
 forge test -vvv
+forge test --fuzz-runs 1000
 ```
 
-## Environment
+All commands must pass before deployment. The GitHub Contracts CI workflow runs these checks for contract changes.
 
-Set secrets in your local shell or CI secret store. Never commit them.
+## Configure environment
+
+Set values in your local shell or a trusted secret manager. Do not commit a populated `.env` file.
 
 ```bash
 export SEPOLIA_RPC_URL="https://your-sepolia-rpc"
-export DEPLOYER_PRIVATE_KEY="your-test-wallet-private-key"
+export DEPLOYER_PRIVATE_KEY="your-sepolia-test-wallet-private-key"
+export EXPECTED_DEPLOYER_ADDRESS="0xYourExpectedDeployerAddress"
+export ETHERSCAN_API_KEY="your-etherscan-api-key"
 ```
 
-Do not paste private keys into chat, source files, command history, or frontend environment variables.
+`EXPECTED_DEPLOYER_ADDRESS` is an additional safety check. The script refuses to broadcast if the private key resolves to a different address. The script also refuses to run on any chain other than Sepolia.
 
-## Deployment
+Never paste a private key or seed phrase into chat. Do not use a wallet holding mainnet assets.
 
-A deployment script will be added after contract tests and review are complete. Before deployment, confirm the selected RPC reports chain ID `11155111`, confirm the deployer address, and review the constructor/admin model. After deployment, record the transaction hash, contract address, chain ID, compiler version, and verified source URL in a deployment record.
+## Deploy
 
-## Post-deployment checks
+From the `contracts` directory:
 
-- Confirm the contract address and chain ID.
-- Confirm the deployer is the expected administrator and is authorized as an instructor.
-- Grant instructor roles deliberately; do not expose admin operations in student UI.
-- Run a complete session flow with test wallets.
-- Verify source code and compiler settings on the explorer.
-- Keep the admin key separate from application users and monitor privileged events.
+```bash
+forge script script/DeployStudentAttendance.s.sol:DeployStudentAttendance \
+  --rpc-url "$SEPOLIA_RPC_URL" \
+  --broadcast
+```
+
+Review the Foundry output and broadcast transaction. The script emits `ContractDeployed` with the contract address, admin address, and chain ID. Save the deployment transaction hash and contract address from the broadcast output.
+
+Do not run this command until the release gates above have been reviewed. The script does not store or publish secrets.
+
+## Verify source on Sepolia Etherscan
+
+From the `contracts` directory, after confirming the deployed address:
+
+```bash
+export CONTRACT_ADDRESS="0xYourDeployedContractAddress"
+forge verify-contract "$CONTRACT_ADDRESS" \
+  src/StudentAttendance.sol:StudentAttendance \
+  --chain sepolia \
+  --etherscan-api-key "$ETHERSCAN_API_KEY"
+```
+
+Wait for explorer verification to complete. Confirm the verified source, compiler version, optimizer settings, constructor arguments (none), and deployed bytecode match the local build.
+
+## Post-deployment validation
+
+1. Confirm the explorer network is Sepolia and the contract address matches the broadcast receipt.
+2. Read `admin()` and `instructors(admin)`; both should identify the expected deployer and the instructor flag should be true.
+3. Read `nextSessionId()`; the initial value should be `1`.
+4. Set `NEXT_PUBLIC_CONTRACT_ADDRESS` to the verified address in the web deployment environment. Set `NEXT_PUBLIC_SEPOLIA_RPC_URL` only to a public RPC endpoint intended for browser use.
+5. Use separate test wallets to authorize an instructor, register a student, create a short test session, sign a QR authorization, and submit attendance. Confirm the receipt and event on Sepolia Etherscan.
+6. Test duplicate attendance, expired QR, rotated nonce, unregistered student, and session boundary rejection.
+7. Record the deployment transaction hash, block number, contract address, chain ID, deployer/admin address, compiler version, optimizer settings, verification URL, and test results in the project release record.
+
+## Operational cautions
+
+- The admin is immutable. Losing the deployer key permanently removes the ability to authorize/revoke instructors.
+- Do not expose admin actions to student accounts.
+- Wallet addresses and attendance transactions are public and pseudonymous, not anonymous.
+- QR possession is not proof of physical presence.
+- A successful Sepolia deployment is a testnet milestone, not production readiness or an independent security audit.

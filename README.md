@@ -2,7 +2,7 @@
 
 A wallet-based attendance application targeting **Ethereum Sepolia**. Authorized instructors create time-bounded sessions, issue EIP-712 QR authorizations, and registered students submit attendance from their own wallets.
 
-> **Project status:** Phases 1–6 are merged. Phase 7 security hardening and adversarial validation are under review. No contract deployment, live transaction, independent audit, or production-readiness claim is made.
+> **Project status:** Phases 1–7 are merged and their relevant CI checks passed. Phase 8 adds Sepolia deployment tooling and a controlled deployment runbook. No live contract deployment, independent audit, or production-readiness claim is made.
 
 ## Phase 6 dashboard
 
@@ -68,6 +68,7 @@ The contract does not expose an enumerable student roster or an attendance count
 │   ├── package.json
 │   └── tsconfig.json
 ├── contracts/
+│   ├── script/DeployStudentAttendance.s.sol
 │   ├── src/StudentAttendance.sol
 │   ├── test/StudentAttendance.t.sol
 │   ├── test/StudentAttendanceInvariant.t.sol
@@ -99,8 +100,8 @@ The contract does not expose an enumerable student roster or an attendance count
 4. Sepolia wallet connection and EIP-712 signing foundation — **merged; CI passed**.
 5. Instructor QR generation, student camera/manual scanning, and attendance transaction flow — **merged**.
 6. Instructor/student dashboards, session creation, student registration, and session controls — **merged; post-merge web CI passed**.
-7. Fuzz, invariant, and security validation — **implementation under review**.
-8. Sepolia deployment, explorer verification, and deployment documentation.
+7. Fuzz, invariant, and security validation — **merged; formatting, build, tests, and 1,000-run fuzz CI passed**.
+8. Sepolia deployment tooling and controlled deployment runbook — **in progress; no live deployment claimed**.
 
 ## Development
 
@@ -120,10 +121,11 @@ cd contracts
 forge fmt --check
 forge build
 forge test
+forge test --fuzz-runs 1000
 ```
 
 Copy `.env.example` to `apps/web/.env.local` for local frontend configuration. Set `NEXT_PUBLIC_CONTRACT_ADDRESS` only after a verified Sepolia deployment; optionally provide `NEXT_PUBLIC_SEPOLIA_RPC_URL`. Never commit private keys, seed phrases, RPC credentials, or other secrets.
 
 ## Current implementation status
 
-Phase 6 adds role-aware dashboard views, contract-backed role detection, session creation and lookup, student registration/revocation, admin instructor authorization/revocation, session pause/resume, QR nonce rotation, and per-wallet attendance checks. Phase 6 is merged and its post-merge web CI passed. These workflows still require a deployed contract address and Sepolia RPC endpoint. Phase 7 adds fuzz and stateful invariant tests; see `docs/PHASE-7-SECURITY-VALIDATION.md`. Browser-level integration tests, dependency advisory triage, deployment, and independent audit remain outstanding. No deployment or live transaction is claimed.
+Phase 6 provides role-aware dashboards and contract-backed management workflows. Phase 7 adds fuzz and stateful invariant tests; see `docs/PHASE-7-SECURITY-VALIDATION.md`. Phase 8 adds a Sepolia-only Foundry deployment script and a verification/post-deployment checklist; see `docs/DEPLOYMENT.md`. Browser-level integration tests, dependency advisory triage, and independent audit remain outstanding. No deployment or live transaction is claimed.
