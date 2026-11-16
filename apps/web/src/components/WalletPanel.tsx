@@ -16,7 +16,7 @@ export function WalletPanel() {
   const wrongNetwork = isConnected && chainId !== sepolia.id;
 
   return (
-    <section className="integration-panel" aria-labelledby="wallet-heading">
+    <section className="integration-panel" id="wallet" aria-labelledby="wallet-heading">
       <div>
         <p className="panel-label">WALLET CONNECTION</p>
         <h2 id="wallet-heading">Connect on Sepolia</h2>
