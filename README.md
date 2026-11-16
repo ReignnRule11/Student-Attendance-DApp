@@ -8,7 +8,7 @@ A wallet-based attendance application targeting **Ethereum Sepolia**. Authorized
 
 - **Role detection:** reads the current contract admin, instructor authorization, and student registration for the connected wallet.
 - **Instructor workspace:** creates sessions, registers or revokes student wallets, loads sessions by ID, pauses/resumes sessions, and rotates QR nonces.
-- **Admin workspace:** authorizes or revokes instructors. The contract admin cannot revoke its own instructor role.
+- **Admin workspace:** authorizes/revokes instructors and proposes a two-step administrator handover; only the proposed wallet can accept.
 - **Student workspace:** shows the connected wallet's registration role and supports per-session attendance checks.
 - **Transaction feedback:** waits for Sepolia receipts and links submitted transactions to Sepolia Etherscan.
 - **Grounded data:** session and role information is read from the contract. The contract has no student directory or attendance enumeration method, so the UI does not fabricate student lists or attendance totals.
