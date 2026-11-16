@@ -9,8 +9,9 @@ contract StudentAttendance {
     uint256 private constant SECP256K1_HALF_ORDER =
         0x7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a0;
 
-    bytes32 private constant DOMAIN_TYPEHASH =
-        keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+    bytes32 private constant DOMAIN_TYPEHASH = keccak256(
+        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+    );
     bytes32 private constant NAME_HASH = keccak256("StudentAttendance");
     bytes32 private constant VERSION_HASH = keccak256("1");
     bytes32 private constant ATTENDANCE_TYPEHASH =
@@ -112,16 +113,18 @@ contract StudentAttendance {
     }
 
     /// @notice Create a session with an inclusive start and exclusive end timestamp.
-    function createSession(uint64 startsAt, uint64 endsAt) external onlyInstructor returns (uint256 sessionId) {
-        if (startsAt >= endsAt || endsAt <= block.timestamp) revert InvalidTimeRange();
+    function createSession(uint64 startsAt, uint64 endsAt)
+        external
+        onlyInstructor
+        returns (uint256 sessionId)
+    {
+        if (startsAt >= endsAt || endsAt <= block.timestamp) {
+            revert InvalidTimeRange();
+        }
 
         sessionId = nextSessionId++;
         sessions[sessionId] = Session({
-            instructor: msg.sender,
-            startsAt: startsAt,
-            endsAt: endsAt,
-            qrNonce: 1,
-            active: true
+            instructor: msg.sender, startsAt: startsAt, endsAt: endsAt, qrNonce: 1, active: true
         });
 
         emit SessionCreated(sessionId, msg.sender, startsAt, endsAt, 1);
@@ -192,17 +195,15 @@ contract StudentAttendance {
 
     function _domainSeparator() private view returns (bytes32) {
         return keccak256(
-            abi.encode(
-                DOMAIN_TYPEHASH,
-                NAME_HASH,
-                VERSION_HASH,
-                block.chainid,
-                address(this)
-            )
+            abi.encode(DOMAIN_TYPEHASH, NAME_HASH, VERSION_HASH, block.chainid, address(this))
         );
     }
 
-    function _recoverSigner(bytes32 digest, bytes calldata signature) private pure returns (address signer) {
+    function _recoverSigner(bytes32 digest, bytes calldata signature)
+        private
+        pure
+        returns (address signer)
+    {
         if (signature.length != 65) revert InvalidSignature();
 
         bytes32 r;
