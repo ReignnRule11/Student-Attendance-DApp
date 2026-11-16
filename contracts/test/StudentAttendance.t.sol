@@ -163,7 +163,6 @@ contract StudentAttendanceTest {
         attendance.markAttendance(sessionId, expiry, 1, signature);
     }
 
-
     function testFuzzValidExpiryRecordsAttendance(uint64 ttlSeed) public {
         uint64 ttl = uint64(uint256(ttlSeed) % 3_600 + 1);
         uint64 expiry = uint64(block.timestamp) + ttl;
