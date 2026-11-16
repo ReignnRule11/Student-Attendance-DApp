@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { isAddress } from "viem";
 import { Html5Qrcode } from "html5-qrcode";
 import { useAccount, useChainId, usePublicClient, useWriteContract } from "wagmi";
@@ -22,6 +22,15 @@ export function StudentAttendanceScanner() {
 
   const configuredAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
   const contractConfigured = Boolean(configuredAddress && isAddress(configuredAddress));
+
+  useEffect(() => {
+    return () => {
+      const scanner = scannerRef.current;
+      if (scanner?.isScanning) {
+        void scanner.stop().then(() => scanner.clear()).catch(() => undefined);
+      }
+    };
+  }, []);
 
   async function stopScanner() {
     const scanner = scannerRef.current;
