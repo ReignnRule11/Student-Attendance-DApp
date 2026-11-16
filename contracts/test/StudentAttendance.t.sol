@@ -163,6 +163,86 @@ contract StudentAttendanceTest {
         attendance.markAttendance(sessionId, expiry, 1, signature);
     }
 
+
+    function testFuzzValidExpiryRecordsAttendance(uint64 ttlSeed) public {
+        uint64 ttl = uint64(uint256(ttlSeed) % 3_600 + 1);
+        uint64 expiry = uint64(block.timestamp) + ttl;
+        bytes memory signature = _sign(INSTRUCTOR_KEY, sessionId, 1, expiry);
+
+        vm.prank(student);
+        attendance.markAttendance(sessionId, expiry, 1, signature);
+
+        require(attendance.hasAttended(sessionId, student), "fuzzed valid attendance missing");
+    }
+
+    function testFuzzNonceRotationInvalidatesOriginalAuthorization(uint8 rotationSeed) public {
+        uint8 rotations = uint8(uint256(rotationSeed) % 8 + 1);
+        uint64 expiry = uint64(block.timestamp + 5 minutes);
+        bytes memory originalSignature = _sign(INSTRUCTOR_KEY, sessionId, 1, expiry);
+
+        for (uint256 i; i < rotations; ++i) {
+            vm.prank(instructor);
+            attendance.rotateQrNonce(sessionId);
+        }
+
+        vm.expectRevert(StudentAttendance.InvalidQrNonce.selector);
+        vm.prank(student);
+        attendance.markAttendance(sessionId, expiry, 1, originalSignature);
+    }
+
+    function testFuzzDuplicateAttendanceAlwaysReverts(uint64 ttlSeed) public {
+        uint64 ttl = uint64(uint256(ttlSeed) % 3_600 + 1);
+        uint64 expiry = uint64(block.timestamp) + ttl;
+        bytes memory signature = _sign(INSTRUCTOR_KEY, sessionId, 1, expiry);
+
+        vm.prank(student);
+        attendance.markAttendance(sessionId, expiry, 1, signature);
+
+        vm.expectRevert(StudentAttendance.AlreadyAttended.selector);
+        vm.prank(student);
+        attendance.markAttendance(sessionId, expiry, 1, signature);
+    }
+
+    function testSessionEndTimestampIsExclusive() public {
+        vm.warp(sessionEnd);
+        bytes memory signature = _sign(INSTRUCTOR_KEY, sessionId, 1, sessionEnd);
+
+        vm.expectRevert(StudentAttendance.SessionNotActive.selector);
+        vm.prank(student);
+        attendance.markAttendance(sessionId, sessionEnd, 1, signature);
+    }
+
+    function testSessionStartTimestampIsInclusive() public {
+        (, uint64 startsAt,,,) = attendance.sessions(sessionId);
+        vm.warp(startsAt);
+        uint64 expiry = uint64(startsAt + 60);
+        bytes memory signature = _sign(INSTRUCTOR_KEY, sessionId, 1, expiry);
+
+        vm.prank(student);
+        attendance.markAttendance(sessionId, expiry, 1, signature);
+
+        require(attendance.hasAttended(sessionId, student), "start boundary should be inclusive");
+    }
+
+    function testUnauthorizedWalletCannotPauseOrRotateSession() public {
+        vm.expectRevert(StudentAttendance.Unauthorized.selector);
+        vm.prank(otherStudent);
+        attendance.setSessionActive(sessionId, false);
+
+        vm.expectRevert(StudentAttendance.Unauthorized.selector);
+        vm.prank(otherStudent);
+        attendance.rotateQrNonce(sessionId);
+    }
+
+    function testRevokedInstructorCannotCreateNewSession() public {
+        vm.prank(address(this));
+        attendance.revokeInstructor(instructor);
+
+        vm.expectRevert(StudentAttendance.Unauthorized.selector);
+        vm.prank(instructor);
+        attendance.createSession(uint64(block.timestamp + 1), uint64(block.timestamp + 1 hours));
+    }
+
     function _sign(uint256 privateKey, uint256 id, uint64 nonce, uint64 expiry)
         private
         returns (bytes memory)
