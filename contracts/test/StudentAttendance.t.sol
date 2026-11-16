@@ -242,6 +242,55 @@ contract StudentAttendanceTest {
         attendance.createSession(uint64(block.timestamp + 1), uint64(block.timestamp + 1 hours));
     }
 
+
+    function testAdminTransferRequiresProposalAndAcceptance() public {
+        address proposed = vm.addr(OTHER_KEY);
+
+        attendance.proposeAdmin(proposed);
+        require(attendance.pendingAdmin() == proposed, "pending admin not recorded");
+
+        vm.expectRevert(StudentAttendance.NoPendingAdmin.selector);
+        vm.prank(student);
+        attendance.acceptAdmin();
+
+        vm.prank(proposed);
+        attendance.acceptAdmin();
+
+        require(attendance.admin() == proposed, "admin transfer failed");
+        require(attendance.pendingAdmin() == address(0), "pending admin not cleared");
+
+        vm.expectRevert(StudentAttendance.Unauthorized.selector);
+        attendance.authorizeInstructor(otherStudent);
+    }
+
+    function testAdminCannotProposeZeroAddress() public {
+        vm.expectRevert(StudentAttendance.ZeroAddress.selector);
+        attendance.proposeAdmin(address(0));
+    }
+
+    function testRevokedInstructorCannotUseExistingSessionQr() public {
+        uint64 expiry = uint64(block.timestamp + 5 minutes);
+        bytes memory signature = _sign(INSTRUCTOR_KEY, sessionId, 1, expiry);
+
+        attendance.revokeInstructor(instructor);
+
+        vm.expectRevert(StudentAttendance.Unauthorized.selector);
+        vm.prank(student);
+        attendance.markAttendance(sessionId, expiry, 1, signature);
+    }
+
+    function testRevokedInstructorCannotManageExistingSession() public {
+        attendance.revokeInstructor(instructor);
+
+        vm.expectRevert(StudentAttendance.Unauthorized.selector);
+        vm.prank(instructor);
+        attendance.rotateQrNonce(sessionId);
+
+        vm.expectRevert(StudentAttendance.Unauthorized.selector);
+        vm.prank(instructor);
+        attendance.setSessionActive(sessionId, false);
+    }
+
     function _sign(uint256 privateKey, uint256 id, uint64 nonce, uint64 expiry)
         private
         returns (bytes memory)
