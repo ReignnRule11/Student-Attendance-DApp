@@ -49,6 +49,34 @@ docs/                     Architecture, threat model, and deployment guides
 .github/workflows/        Continuous integration
 .env.example              Names of required public/configuration variables only
 ```
+student-attendance-dapp/
+├── apps/
+│   └── web/
+│       ├── app/
+│       │   ├── dashboard/
+│       │   ├── instructor/
+│       │   ├── student/
+│       │   └── verify/
+│       ├── components/
+│       ├── hooks/
+│       └── lib/
+├── contracts/
+│   ├── src/
+│   │   └── StudentAttendance.sol
+│   ├── test/
+│   │   └── StudentAttendance.t.sol
+│   ├── script/
+│   └── foundry.toml
+├── docs/
+│   ├── ARCHITECTURE.md
+│   ├── SECURITY.md
+│   └── DEPLOYMENT.md
+├── .github/
+│   └── workflows/
+│       └── ci.yml
+├── .env.example
+└── README.md
+
 
 ## Delivery phases
 
