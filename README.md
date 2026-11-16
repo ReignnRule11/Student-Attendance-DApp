@@ -6,7 +6,7 @@ A wallet-based attendance application targeting **Ethereum Sepolia**. Authorized
 
 ## Phase 6 dashboard
 
-- **Role detection:** reads the immutable contract admin, instructor authorization, and student registration for the connected wallet.
+- **Role detection:** reads the current contract admin, instructor authorization, and student registration for the connected wallet.
 - **Instructor workspace:** creates sessions, registers or revokes student wallets, loads sessions by ID, pauses/resumes sessions, and rotates QR nonces.
 - **Admin workspace:** authorizes or revokes instructors. The contract admin cannot revoke its own instructor role.
 - **Student workspace:** shows the connected wallet's registration role and supports per-session attendance checks.
