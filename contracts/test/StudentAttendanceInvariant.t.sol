@@ -11,7 +11,6 @@ interface VmInvariant {
     function warp(uint256 timestamp) external;
     function chainId(uint256 newChainId) external;
     function prank(address sender) external;
-    function targetContract(address target) external;
 }
 
 contract AttendanceInvariantHandler {
@@ -112,7 +111,11 @@ contract StudentAttendanceInvariantTest {
         handler = new AttendanceInvariantHandler(
             attendance, instructor, student, INSTRUCTOR_KEY, sessionId
         );
-        vm.targetContract(address(handler));
+    }
+
+    function targetContracts() public view returns (address[] memory targets) {
+        targets = new address[](1);
+        targets[0] = address(handler);
     }
 
     function invariant_attendanceFlagMatchesRecordedTimestamp() public view {
