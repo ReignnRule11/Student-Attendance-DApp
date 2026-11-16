@@ -48,7 +48,8 @@ contract AttendanceInvariantHandler {
 
         if (
             !active || sessionInstructor != instructor || block.timestamp >= endsAt
-                || !attendance.registeredStudents(student) || attendance.hasAttended(sessionId, student)
+                || !attendance.registeredStudents(student)
+                || attendance.hasAttended(sessionId, student)
         ) return;
 
         uint64 expiry = uint64(block.timestamp + uint256(ttlSeed) % 300 + 1);
@@ -70,14 +71,12 @@ contract AttendanceInvariantHandler {
 
     function rotateNonce() external {
         vm.prank(instructor);
-        try attendance.rotateQrNonce(sessionId) { }
-        catch { }
+        try attendance.rotateQrNonce(sessionId) { } catch { }
     }
 
     function toggleSession(bool active) external {
         vm.prank(instructor);
-        try attendance.setSessionActive(sessionId, active) { }
-        catch { }
+        try attendance.setSessionActive(sessionId, active) { } catch { }
     }
 }
 
@@ -126,8 +125,7 @@ contract StudentAttendanceInvariantTest {
         uint64 first = handler.firstRecordedAt();
         if (first != 0) {
             require(
-                attendance.attendanceAt(sessionId, student) == first,
-                "attendance timestamp mutated"
+                attendance.attendanceAt(sessionId, student) == first, "attendance timestamp mutated"
             );
         }
     }
