@@ -1,5 +1,5 @@
 import { createConfig, http } from "wagmi";
-import { injected } from "wagmi/connectors";
+import { injected } from "@wagmi/core";
 import { sepolia } from "wagmi/chains";
 
 const rpcUrl = process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL;
