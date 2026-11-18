@@ -4,6 +4,7 @@ import { DeploymentStatus } from "../components/DeploymentStatus";
 import { RoleDashboard } from "../components/RoleDashboard";
 import { AuthorizationSigner } from "../components/AuthorizationSigner";
 import { StudentAttendanceScanner } from "../components/StudentAttendanceScanner";
+import { PwaControls } from "../components/PwaControls";
 
 const capabilities = [
   { number: "01", title: "Instructor-led sessions", description: "Authorized instructors create time-bound sessions and sign short-lived QR codes." },
@@ -18,7 +19,10 @@ export default function Home() {
         <Link className="brand" href="/" aria-label="Student Attendance home">
           <span className="brand-mark">SA</span><span>Student Attendance</span>
         </Link>
-        <span className="network-pill"><span className="status-dot" /> Ethereum Sepolia</span>
+        <div className="topbar-tools">
+          <span className="network-pill"><span className="status-dot" /> Ethereum Sepolia</span>
+          <PwaControls />
+        </div>
       </header>
       <section className="hero">
         <p className="eyebrow">DECENTRALIZED ATTENDANCE</p>
