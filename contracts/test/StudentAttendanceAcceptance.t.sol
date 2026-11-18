@@ -142,9 +142,7 @@ contract StudentAttendanceAcceptanceTest {
         attendance.markAttendance(sessionId, expiry, 1, signature);
     }
 
-    function _sign(uint256 signingKey, uint64 nonce, uint64 expiry)
-        private
-        returns (bytes memory)
+    function _sign(uint256 signingKey, uint64 nonce, uint64 expiry) private returns (bytes memory)
     {
         bytes32 structHash =
             keccak256(abi.encode(ATTENDANCE_TYPEHASH, sessionId, uint256(nonce), uint256(expiry)));
