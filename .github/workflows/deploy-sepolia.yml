@@ -1,0 +1,92 @@
+name: Deploy Student Attendance to Sepolia
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type DEPLOY TO SEPOLIA to authorize a testnet deployment'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sepolia-contract-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Validate and deploy to Sepolia
+    if: ${{ inputs.confirmation == 'DEPLOY TO SEPOLIA' }}
+    runs-on: ubuntu-latest
+    environment: sepolia
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      - name: Check Solidity formatting
+        run: forge fmt --check
+
+      - name: Build contracts
+        run: forge build --sizes
+
+      - name: Run contract tests
+        run: forge test -vvv
+
+      - name: Run elevated fuzz tests
+        run: forge test --fuzz-runs 1000
+
+      - name: Validate deployment configuration
+        env:
+          SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
+          DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+          EXPECTED_DEPLOYER_ADDRESS: ${{ secrets.EXPECTED_DEPLOYER_ADDRESS }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${SEPOLIA_RPC_URL:-}" || -z "${DEPLOYER_PRIVATE_KEY:-}" || -z "${EXPECTED_DEPLOYER_ADDRESS:-}" ]]; then
+            echo "::error::Configure SEPOLIA_RPC_URL, DEPLOYER_PRIVATE_KEY, and EXPECTED_DEPLOYER_ADDRESS in the sepolia environment."
+            exit 1
+          fi
+
+          chain_id="$(cast chain-id --rpc-url "$SEPOLIA_RPC_URL")"
+          if [[ "$chain_id" != "11155111" ]]; then
+            echo "::error::RPC chain ID is $chain_id; expected Sepolia 11155111."
+            exit 1
+          fi
+
+          actual_address="$(cast wallet address --private-key "$DEPLOYER_PRIVATE_KEY")"
+          if [[ "${actual_address,,}" != "${EXPECTED_DEPLOYER_ADDRESS,,}" ]]; then
+            echo "::error::Deployer key does not match EXPECTED_DEPLOYER_ADDRESS."
+            exit 1
+          fi
+
+          echo "Sepolia chain ID and expected deployer address verified."
+          echo "Deployer: $actual_address"
+
+      - name: Deploy contract
+        env:
+          SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
+          DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+          EXPECTED_DEPLOYER_ADDRESS: ${{ secrets.EXPECTED_DEPLOYER_ADDRESS }}
+        run: |
+          set -euo pipefail
+          forge script script/DeployStudentAttendance.s.sol:DeployStudentAttendance \
+            --rpc-url "$SEPOLIA_RPC_URL" \
+            --broadcast \
+            -vvvv
+
+      - name: Deployment safety reminder
+        if: success()
+        run: |
+          echo "Deployment command completed. Verify the transaction receipt and contract address on Sepolia Etherscan before configuring the frontend."
