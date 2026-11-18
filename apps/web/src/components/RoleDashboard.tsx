@@ -5,6 +5,7 @@ import { decodeEventLog, isAddress } from "viem";
 import { useAccount, useChainId, usePublicClient, useWriteContract } from "wagmi";
 import { sepolia } from "wagmi/chains";
 import { studentAttendanceAbi } from "../lib/contract/abi";
+import { isStudentAttendanceConfigured, studentAttendanceAddress } from "../lib/contract/deployment";
 
 type SessionView = {
   instructor: `0x${string}`;
@@ -27,8 +28,8 @@ export function RoleDashboard() {
   const chainId = useChainId();
   const publicClient = usePublicClient();
   const { writeContractAsync, isPending } = useWriteContract();
-  const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
-  const configured = Boolean(contractAddress && isAddress(contractAddress));
+  const contractAddress = studentAttendanceAddress;
+  const configured = isStudentAttendanceConfigured;
   const onSepolia = chainId === sepolia.id;
 
   const [adminAddress, setAdminAddress] = useState("");

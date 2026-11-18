@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { isAddress } from "viem";
 import { useAccount, useChainId, usePublicClient, useSignTypedData } from "wagmi";
 import { studentAttendanceAbi } from "../lib/contract/abi";
+import { isStudentAttendanceConfigured, studentAttendanceAddress } from "../lib/contract/deployment";
 import { sepolia } from "wagmi/chains";
 
 const attendanceTypes = {
@@ -27,8 +27,8 @@ export function AuthorizationSigner() {
   const [qrPayload, setQrPayload] = useState("");
   const [localError, setLocalError] = useState("");
 
-  const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
-  const validContractAddress = Boolean(contractAddress && isAddress(contractAddress));
+  const contractAddress = studentAttendanceAddress;
+  const validContractAddress = isStudentAttendanceConfigured;
   const canSign = isConnected && chainId === sepolia.id && validContractAddress;
 
   async function handleSign() {

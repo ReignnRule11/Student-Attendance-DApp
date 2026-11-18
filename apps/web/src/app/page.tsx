@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { WalletPanel } from "../components/WalletPanel";
+import { DeploymentStatus } from "../components/DeploymentStatus";
 import { RoleDashboard } from "../components/RoleDashboard";
 import { AuthorizationSigner } from "../components/AuthorizationSigner";
 import { StudentAttendanceScanner } from "../components/StudentAttendanceScanner";
@@ -25,9 +26,10 @@ export default function Home() {
         <p className="hero-copy">Instructor-authorized sessions, wallet-based check-ins, and tamper-resistant attendance records on Ethereum.</p>
         <div className="hero-actions">
           <Link className="primary-action" href="#wallet">Connect wallet <span aria-hidden="true">↗</span></Link>
-          <span className="phase-note">Phase 6 · Role-aware dashboards</span>
+          <span className="phase-note">Sepolia deployment · Frontend integration</span>
         </div>
       </section>
+      <DeploymentStatus />
       <WalletPanel />
       <RoleDashboard />
       <AuthorizationSigner />
@@ -42,7 +44,7 @@ export default function Home() {
           ))}
         </div>
       </section>
-      <footer className="footer"><span>Student Attendance DApp</span><span>Sepolia testnet · Contract deployment still required</span></footer>
+      <footer className="footer"><span>Student Attendance DApp</span><span>Sepolia testnet · Contract status checked on-chain</span></footer>
     </main>
   );
 }

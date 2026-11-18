@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { isAddress } from "viem";
 import { Html5Qrcode } from "html5-qrcode";
 import { useAccount, useChainId, usePublicClient, useWriteContract } from "wagmi";
 import { sepolia } from "wagmi/chains";
 import { studentAttendanceAbi } from "../lib/contract/abi";
+import { isStudentAttendanceConfigured, studentAttendanceAddress } from "../lib/contract/deployment";
 import { parseAttendanceQrPayload } from "../lib/qr/attendance-payload";
 
 export function StudentAttendanceScanner() {
@@ -20,8 +20,8 @@ export function StudentAttendanceScanner() {
   const [error, setError] = useState("");
   const [transactionHash, setTransactionHash] = useState("");
 
-  const configuredAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
-  const contractConfigured = Boolean(configuredAddress && isAddress(configuredAddress));
+  const configuredAddress = studentAttendanceAddress;
+  const contractConfigured = isStudentAttendanceConfigured;
 
   useEffect(() => {
     return () => {
