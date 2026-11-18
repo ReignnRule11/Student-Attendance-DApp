@@ -5,7 +5,9 @@
 
 A wallet-based attendance system built on **Ethereum Sepolia**. Instructors create time-bounded attendance sessions and issue signed QR authorizations. Registered students scan or enter the QR payload and submit attendance transactions using their own wallets.
 
-> **Project status:** Phases 1–9 have been merged. Sepolia deployment tooling is available, but **the contract has not been deployed**. This repository is a testnet-stage project, not an independently audited or production-ready system.
+> **Project status:** Phases 1–9 are merged and the contract has been deployed to Ethereum Sepolia. The frontend is configured to the deployed address and includes a runtime bytecode/ABI-read check. This remains a testnet-stage project, not an independently audited or production-ready system.
+>
+> **Sepolia contract:** [0x66d5E20AFEA78C97BefC47FaCd462D93b888C703](https://sepolia.etherscan.io/address/0x66d5E20AFEA78C97BefC47FaCd462D93b888C703) · [Successful deployment workflow](https://github.com/ReignnRule11/Student-Attendance-DApp/actions/runs/44317302407)
 
 ---
 
@@ -251,7 +253,9 @@ The deployment script uses server-side/deployment environment values documented 
 
 Do not commit `.env.local`, private keys, seed phrases, RPC credentials, or other secrets. Never paste a private key or seed phrase into chat or a frontend environment variable.
 
-**Important:** `NEXT_PUBLIC_CONTRACT_ADDRESS` is intentionally not populated with a live address. Set it only after a successful Sepolia deployment and independent verification.
+**Deployed Sepolia configuration:** `NEXT_PUBLIC_CONTRACT_ADDRESS=0x66d5E20AFEA78C97BefC47FaCd462D93b888C703`. This value is included in `.env.example` and is public configuration, not a secret. For a hosted deployment, add the same variable to the hosting provider's environment settings and trigger a fresh build. The optional `NEXT_PUBLIC_SEPOLIA_RPC_URL` must be a browser-safe, rate-limited Sepolia endpoint; never use a deployer key or server-only credential in a `NEXT_PUBLIC_*` variable.
+
+The homepage performs runtime checks for deployed bytecode and reads `admin()` and `nextSessionId()`. These checks confirm the configured address responds like the expected contract; they do not establish Etherscan source verification or an independent audit.
 
 ## Validation and tests
 
