@@ -8,7 +8,12 @@ export const walletConfig = createConfig({
   chains: [sepolia],
   connectors: [injected()],
   transports: {
-    [sepolia.id]: http(rpcUrl || undefined),
+    // Bound each RPC request and disable automatic retries so a failed public
+    // endpoint cannot leave deployment checks waiting through retry backoff.
+    [sepolia.id]: http(rpcUrl || undefined, {
+      timeout: 6_000,
+      retryCount: 0,
+    }),
   },
   ssr: true,
 });
