@@ -62,8 +62,8 @@ jobs:
 
           # Foundry's vm.envUint expects a 0x-prefixed hexadecimal uint256.
           # Accept either 64 hex characters or the same value with a 0x prefix.
-          if [[ "$DEPLOYER_PRIVATE_KEY" =~ ^0x?([[:xdigit:]]{64})$ ]]; then
-            normalized_key="0x${BASH_REMATCH[1]}"
+          if [[ "$DEPLOYER_PRIVATE_KEY" =~ ^(0x)?([[:xdigit:]]{64})$ ]]; then
+            normalized_key="0x${BASH_REMATCH[2]}"
           else
             echo "::error::DEPLOYER_PRIVATE_KEY must contain exactly 64 hexadecimal characters, optionally prefixed with 0x."
             exit 1
