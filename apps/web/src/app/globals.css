@@ -95,6 +95,7 @@ button { min-height: 44px; }
 .scanner-controls textarea { font-size: 16px; }
 .qr-code-surface svg { display: block; width: min(100%, 240px); height: auto; }
 
+.topbar-tools { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 9px; min-width: 0; }
 .pwa-controls { display: flex; align-items: center; gap: 8px; }
 .pwa-install-button {
   display: inline-flex;
