@@ -44,6 +44,7 @@ test("PWA manifest and service worker are available", async ({ page, request }) 
 
   const workerResponse = await request.get("/sw.js");
   expect(workerResponse.ok()).toBeTruthy();
+  await expect.poll(() => page.evaluate(async () => Boolean(await navigator.serviceWorker.getRegistration()))).toBeTruthy();
 });
 
 test("main workflows fit common mobile and tablet viewports without horizontal overflow", async ({ page }) => {
