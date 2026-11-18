@@ -2,7 +2,13 @@
 
 ## Deployment status
 
-The repository contains a Sepolia-only deployment script. **No live deployment is performed by CI or by opening this pull request.** Do not configure the frontend contract address until a deployment transaction has succeeded and the deployed bytecode has been verified.
+The contract has been deployed to Ethereum Sepolia by the guarded GitHub Actions workflow.
+
+- Network: Ethereum Sepolia (chain ID `11155111`)
+- Contract: [`0x66d5E20AFEA78C97BefC47FaCd462D93b888C703`](https://sepolia.etherscan.io/address/0x66d5E20AFEA78C97BefC47FaCd462D93b888C703)
+- Deployment workflow: [run #23 — successful](https://github.com/ReignnRule11/Student-Attendance-DApp/actions/runs/44317302407)
+
+The workflow completed the Foundry validation suite and reported successful on-chain execution. The frontend is configured with this address and checks runtime bytecode plus `admin()` and `nextSessionId()` reads. Etherscan source verification and live browser end-to-end tests remain separate release tasks.
 
 ## Release gates before using a real deployment wallet
 
@@ -76,14 +82,14 @@ forge verify-contract "$CONTRACT_ADDRESS" \
   --etherscan-api-key "$ETHERSCAN_API_KEY"
 ```
 
-Wait for explorer verification to complete. Confirm the verified source, compiler version, optimizer settings, constructor arguments (none), and deployed bytecode match the local build.
+Wait for explorer verification to complete. Confirm the verified source, compiler version, optimizer settings, constructor arguments (none), and deployed bytecode match the local build. Do not describe the source as verified until Etherscan explicitly reports successful verification.
 
 ## Post-deployment validation
 
 1. Confirm the explorer network is Sepolia and the contract address matches the broadcast receipt.
 2. Read `admin()`, `pendingAdmin()`, and `instructors(admin)`; the admin should identify the expected deployer, pending admin should be the zero address, and the instructor flag should be true.
 3. Read `nextSessionId()`; the initial value should be `1`.
-4. Set `NEXT_PUBLIC_CONTRACT_ADDRESS` to the verified address in the web deployment environment. Set `NEXT_PUBLIC_SEPOLIA_RPC_URL` only to a public RPC endpoint intended for browser use.
+4. Set `NEXT_PUBLIC_CONTRACT_ADDRESS=0x66d5E20AFEA78C97BefC47FaCd462D93b888C703` in the web deployment environment. This is already the value in the repository's `.env.example`. Set `NEXT_PUBLIC_SEPOLIA_RPC_URL` only to a browser-safe public RPC endpoint.
 5. Use separate test wallets to authorize an instructor, register a student, create a short test session, sign a QR authorization, and submit attendance. Confirm the receipt and event on Sepolia Etherscan.
 6. Test duplicate attendance, expired QR, rotated nonce, unregistered student, and session boundary rejection.
 7. Record the deployment transaction hash, block number, contract address, chain ID, deployer/admin address, compiler version, optimizer settings, verification URL, and test results in the project release record.
