@@ -128,7 +128,8 @@ textarea:focus-visible {
     gap: 10px;
     flex-wrap: wrap;
   }
-  .topbar .network-pill { margin-left: auto; }
+  .topbar-tools { width: 100%; justify-content: space-between; }
+  .topbar .network-pill { margin-left: 0; }
   .integration-panel { grid-template-columns: minmax(0, 1fr); gap: 18px; padding: 22px; }
   .capability-grid,
   .dashboard-grid { grid-template-columns: minmax(0, 1fr); }
@@ -148,7 +149,7 @@ textarea:focus-visible {
   .brand-mark { width: 32px; height: 32px; }
   .topbar { align-items: center; }
   .network-pill { gap: 6px; padding: 7px 8px; font-size: 9px; }
-  .pwa-controls { width: 100%; justify-content: flex-end; }
+  .pwa-controls { width: auto; justify-content: flex-end; }
   .pwa-install-button { min-height: 40px; }
   .hero { padding: 56px 0 38px; }
   h1 { font-size: clamp(38px, 11vw, 52px); }
