@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@tanstack/react-query": "5.80.10",
+    "@wagmi/core": "2.22.1",
     "html5-qrcode": "2.3.8",
     "next": "15.5.29",
     "qrcode.react": "4.2.0",
