@@ -64,3 +64,115 @@ h1 { margin:22px 0; font-size:clamp(46px,8vw,82px); line-height:1.02; letter-spa
   .capability-card h3 { margin-top:24px; } .dashboard-section { padding:20px; } .footer { flex-direction:column; }
   .qr-result { grid-template-columns:1fr; justify-items:start; } .qr-code-surface { max-width:100%; }
 }
+
+
+/* Responsive layout refinements and accessible touch targets. */
+html { min-width: 320px; overflow-x: clip; }
+body { min-width: 320px; overflow-x: clip; }
+.shell { width: min(1120px, calc(100% - clamp(24px, 5vw, 48px))); }
+.integration-panel,
+.dashboard-section,
+.dashboard-card,
+.qr-result,
+.signer-fields,
+.scanner-controls { min-width: 0; }
+.integration-panel > *,
+.dashboard-section > *,
+.dashboard-card > * { min-width: 0; }
+code,
+.wallet-address,
+.network-status,
+.session-details p,
+.explorer-link { overflow-wrap: anywhere; word-break: break-word; }
+.signer-fields input,
+.dashboard-card input,
+.scanner-controls textarea { min-width: 0; max-width: 100%; }
+.primary-action,
+.secondary-action,
+button { min-height: 44px; }
+.signer-fields input,
+.dashboard-card input,
+.scanner-controls textarea { font-size: 16px; }
+.qr-code-surface svg { display: block; width: min(100%, 240px); height: auto; }
+
+.pwa-controls { display: flex; align-items: center; gap: 8px; }
+.pwa-install-button {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  border: 1px solid #397b69;
+  border-radius: 999px;
+  background: #123027;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+}
+.pwa-install-button:focus-visible,
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+@media (max-width: 760px) {
+  .shell { width: min(100% - 32px, 1120px); }
+  .topbar {
+    height: auto;
+    min-height: 70px;
+    padding: 12px 0;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .topbar .network-pill { margin-left: auto; }
+  .integration-panel { grid-template-columns: minmax(0, 1fr); gap: 18px; padding: 22px; }
+  .capability-grid,
+  .dashboard-grid { grid-template-columns: minmax(0, 1fr); }
+  .capability-card { min-height: 0; }
+  .capability-card h3 { margin-top: 22px; }
+  .hero { padding: 72px 0 46px; }
+  .workflow { padding: 60px 0; }
+  .dashboard-section { padding: 20px; }
+  .footer { flex-direction: column; }
+  .qr-result { grid-template-columns: minmax(0, 1fr); justify-items: start; }
+  .qr-code-surface { max-width: 100%; }
+}
+
+@media (max-width: 480px) {
+  .shell { width: calc(100% - 24px); }
+  .brand { gap: 8px; font-size: 13px; }
+  .brand-mark { width: 32px; height: 32px; }
+  .topbar { align-items: center; }
+  .network-pill { gap: 6px; padding: 7px 8px; font-size: 9px; }
+  .pwa-controls { width: 100%; justify-content: flex-end; }
+  .pwa-install-button { min-height: 40px; }
+  .hero { padding: 56px 0 38px; }
+  h1 { font-size: clamp(38px, 11vw, 52px); }
+  .hero-copy { font-size: 14px; line-height: 1.7; }
+  .hero-actions { align-items: stretch; gap: 12px; }
+  .hero-actions > * { max-width: 100%; }
+  .integration-panel { padding: 17px; border-radius: 13px; }
+  .integration-panel h2 { font-size: 21px; }
+  .wallet-controls,
+  .scanner-actions,
+  .dashboard-actions { align-items: stretch; }
+  .wallet-controls > *,
+  .scanner-actions > *,
+  .dashboard-actions > * { max-width: 100%; }
+  .primary-action,
+  .secondary-action { justify-content: center; text-align: center; overflow-wrap: anywhere; }
+  .dashboard-section { padding: 16px; }
+  .dashboard-card { padding: 15px; }
+  .role-strip { align-items: stretch; }
+  .role-chip { overflow-wrap: anywhere; }
+  .qr-result { padding: 13px; }
+  .footer { padding-bottom: max(28px, env(safe-area-inset-bottom)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
