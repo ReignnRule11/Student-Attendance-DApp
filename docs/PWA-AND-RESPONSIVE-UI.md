@@ -6,7 +6,7 @@ The frontend uses responsive layouts for narrow phones, larger phones, tablets, 
 ## PWA behavior
 - Web app manifest enables standalone installation where supported.
 - A service worker registers under the current deployment path, including the GitHub Pages repository subpath.
-- The app shell and same-origin static assets are cached for repeat visits and an offline navigation fallback.
+- The app shell and its referenced same-origin Next.js JavaScript/CSS assets are precached for repeat visits and an offline navigation fallback.
 - Cross-origin requests are deliberately excluded from caching. Wallet providers, Sepolia RPC, QR signing, and transactions require a live network connection.
 - An install button appears only when the browser emits the supported `beforeinstallprompt` event. On browsers without that event, use the browser's own **Install app** or **Add to Home Screen** menu.
 
