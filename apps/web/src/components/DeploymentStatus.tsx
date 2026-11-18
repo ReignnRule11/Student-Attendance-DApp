@@ -63,6 +63,9 @@ export function DeploymentStatus() {
   }, [publicClient]);
 
   useEffect(() => {
+    // This effect synchronizes the component with the external Sepolia RPC.
+    // The callback updates state before and after its asynchronous reads.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void verifyDeployment();
   }, [verifyDeployment]);
 

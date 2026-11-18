@@ -81,7 +81,11 @@ export function RoleDashboard() {
     }
   }, [address, publicClient, contractAddress, configured, onSepolia]);
 
-  useEffect(() => { void loadRoles(); }, [loadRoles]);
+  useEffect(() => {
+    // Load wallet roles from the external Sepolia contract when wallet/network changes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadRoles();
+  }, [loadRoles]);
 
   const sendTransaction = async (functionName: "registerStudent" | "revokeStudent" | "authorizeInstructor" | "revokeInstructor" | "setSessionActive" | "rotateQrNonce" | "proposeAdmin" | "acceptAdmin", args: readonly unknown[], successMessage: string) => {
     if (!address || !contractAddress || !configured || !publicClient || !onSepolia) {
