@@ -8,7 +8,22 @@ self.addEventListener("install", (event) => {
     (async () => {
       const cache = await caches.open(CACHE_NAME);
       try {
-        await cache.add(APP_SHELL_URL);
+        const shellResponse = await fetch(APP_SHELL_URL, { cache: "reload" });
+        if (shellResponse.ok) {
+          await cache.put(APP_SHELL_URL, shellResponse.clone());
+          const html = await shellResponse.text();
+          const assets = [...html.matchAll(/(?:src|href)=["']([^"']+)["']/g)]
+            .map((match) => new URL(match[1], APP_SHELL_URL))
+            .filter(
+              (url) =>
+                url.origin === self.location.origin &&
+                url.pathname.startsWith(SCOPE_PATH) &&
+                url.pathname.includes("/_next/static/"),
+            );
+          await Promise.all(
+            assets.map((url) => cache.add(url.href).catch(() => undefined)),
+          );
+        }
       } catch {
         // The app remains usable online if the first offline-shell request fails.
       }
