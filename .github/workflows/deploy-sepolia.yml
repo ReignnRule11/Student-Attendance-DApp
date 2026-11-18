@@ -46,6 +46,7 @@ jobs:
         run: forge test --fuzz-runs 1000
 
       - name: Validate deployment configuration
+        id: validate
         env:
           SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
           DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
@@ -59,13 +60,26 @@ jobs:
             exit 1
           fi
 
+          # Foundry's vm.envUint expects a 0x-prefixed hexadecimal uint256.
+          # Accept either 64 hex characters or the same value with a 0x prefix.
+          if [[ "$DEPLOYER_PRIVATE_KEY" =~ ^(0x)?([[:xdigit:]]{64})$ ]]; then
+            normalized_key="0x${BASH_REMATCH[2]}"
+          else
+            echo "::error::DEPLOYER_PRIVATE_KEY must contain exactly 64 hexadecimal characters, optionally prefixed with 0x."
+            exit 1
+          fi
+
+          # Mask the normalized form too, then pass it to later steps via GITHUB_ENV.
+          echo "::add-mask::$normalized_key"
+          echo "DEPLOYER_PRIVATE_KEY=$normalized_key" >> "$GITHUB_ENV"
+
           chain_id="$(cast chain-id --rpc-url "$SEPOLIA_RPC_URL")"
           if [[ "$chain_id" != "11155111" ]]; then
             echo "::error::RPC chain ID is $chain_id; expected Sepolia 11155111."
             exit 1
           fi
 
-          actual_address="$(cast wallet address --private-key "$DEPLOYER_PRIVATE_KEY")"
+          actual_address="$(cast wallet address --private-key "$normalized_key")"
           if [[ "${actual_address,,}" != "${EXPECTED_DEPLOYER_ADDRESS,,}" ]]; then
             echo "::error::Deployer key does not match EXPECTED_DEPLOYER_ADDRESS."
             exit 1
@@ -77,7 +91,6 @@ jobs:
       - name: Deploy contract
         env:
           SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
-          DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
           EXPECTED_DEPLOYER_ADDRESS: ${{ secrets.EXPECTED_DEPLOYER_ADDRESS }}
         run: |
           set -euo pipefail
