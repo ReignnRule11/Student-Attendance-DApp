@@ -60,3 +60,18 @@ test("main workflows fit common mobile and tablet viewports without horizontal o
   await expect(page.getByRole("link", { name: /Connect wallet/i })).toBeVisible();
   await expect(page.getByLabel("Or paste the QR payload")).toBeVisible();
 });
+
+
+test("cached application shell can reopen while offline", async ({ page, context }) => {
+  await page.goto("/");
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+  });
+  await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller));
+  await page.reload();
+  await page.waitForLoadState("networkidle");
+
+  await context.setOffline(true);
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("heading", { name: /Attendance that is verifiable/i })).toBeVisible();
+});
