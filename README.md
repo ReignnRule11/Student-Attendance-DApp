@@ -25,6 +25,7 @@ A wallet-based attendance system built on **Ethereum Sepolia**. Instructors crea
 - [Validation and tests](#validation-and-tests)
 - [Sepolia deployment](#sepolia-deployment)
 - [End-to-end verification](#end-to-end-verification)
+- [Local acceptance tests](#local-acceptance-tests)
 - [Delivery progress](#delivery-progress)
 - [Contributing](#contributing)
 
@@ -190,6 +191,7 @@ These limitations must be considered before using the system for consequential a
 │   ├── DEPLOYMENT.md
 │   ├── END-TO-END-TESTING.md
 │   ├── PHASE-7-SECURITY-VALIDATION.md
+│   ├── PHASE-12-LOCAL-ACCEPTANCE.md
 │   └── SECURITY.md
 ├── .env.example
 └── README.md
@@ -278,6 +280,21 @@ Workflow results:
 
 The Playwright suite checks browser rendering and key page controls only. It does not connect real wallets, sign typed data, or submit transactions. Follow [docs/END-TO-END-TESTING.md](docs/END-TO-END-TESTING.md) for the live two-wallet Sepolia acceptance procedure. Passing CI is not a substitute for completing that procedure or obtaining an independent security audit.
 
+## Local acceptance tests
+
+Phase 12 adds a Foundry integration suite using separate deterministic admin, instructor, student, second-student, and unregistered-wallet identities. It tests the valid multi-student QR lifecycle, duplicate rejection, unregistered-wallet rejection, expired QR, nonce rotation, paused session, revoked instructor, and forged signer.
+
+Run it from the repository root:
+
+```bash
+cd contracts
+forge fmt --check
+forge build --sizes
+forge test --match-contract StudentAttendanceAcceptanceTest -vvv
+```
+
+See [docs/PHASE-12-LOCAL-ACCEPTANCE.md](docs/PHASE-12-LOCAL-ACCEPTANCE.md). These are local EVM tests, not live Sepolia wallet transactions or browser E2E tests. The two-wallet Sepolia acceptance gate remains outstanding.
+
 ## Sepolia deployment
 
 A Sepolia-only Foundry deployment script and controlled deployment runbook are included.
@@ -302,11 +319,13 @@ The deployer becomes the initial administrator. Protect that wallet carefully; a
 | 8 | Sepolia deployment tooling and deployment runbook | Merged |
 | 9 | Two-step admin handover and instructor-revocation enforcement | Merged |
 | 10 | Sepolia contract deployment and frontend configuration | Merged |
-| 11 | Playwright browser smoke tests and live Sepolia acceptance runbook | In review |
+| 11 | Playwright browser smoke tests and live Sepolia acceptance runbook | Merged |
+| 12 | Local multi-wallet contract acceptance suite | In progress (CI pending) |
 
 ### Remaining release work
 
 - Complete the live two-wallet Sepolia acceptance test and retain transaction evidence.
+- Complete Phase 12 local acceptance CI and review its test results.
 - Add deeper browser/wallet integration coverage; current Playwright tests are smoke tests only.
 - Triage and resolve dependency security advisories.
 - Review operational controls and consider multisig administration.
