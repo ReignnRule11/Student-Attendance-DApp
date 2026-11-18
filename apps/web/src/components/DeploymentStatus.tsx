@@ -15,12 +15,32 @@ type DeploymentCheck = {
   nextSessionId?: string;
 };
 
+const DEPLOYMENT_CHECK_TIMEOUT_MS = 18_000;
+
 const initialCheck: DeploymentCheck = {
   state: studentAttendanceAddress ? "checking" : "not-configured",
   message: studentAttendanceAddress
     ? "Checking the Sepolia deployment…"
     : "The Sepolia contract address is not configured in this frontend build.",
 };
+
+function withTimeout<T>(operation: Promise<T>, timeoutMs: number): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(
+        new Error(
+          `Sepolia RPC check timed out after ${Math.round(timeoutMs / 1000)} seconds. Check your connection or RPC endpoint, then retry.`,
+        ),
+      );
+    }, timeoutMs);
+  });
+
+  return Promise.race([operation, timeout]).finally(() => {
+    if (timeoutId !== undefined) clearTimeout(timeoutId);
+  });
+}
 
 export function DeploymentStatus() {
   const publicClient = usePublicClient({ chainId: sepolia.id });
@@ -32,32 +52,62 @@ export function DeploymentStatus() {
       return;
     }
     if (!publicClient) {
-      setCheck({ state: "failed", message: "Sepolia RPC client is unavailable. Check the public RPC configuration and retry." });
+      setCheck({
+        state: "failed",
+        message: "Sepolia RPC client is unavailable. Check the public RPC configuration and retry.",
+      });
       return;
     }
 
-    setCheck({ state: "checking", message: "Checking deployed bytecode and contract reads on Sepolia…" });
-    try {
-      const bytecode = await publicClient.getBytecode({ address: studentAttendanceAddress });
-      if (!bytecode || bytecode === "0x") {
-        throw new Error("No contract bytecode exists at the configured address on Sepolia.");
-      }
+    setCheck({
+      state: "checking",
+      message: "Checking deployed bytecode and contract reads on Sepolia…",
+    });
 
-      const [admin, nextSessionId] = await Promise.all([
-        publicClient.readContract({ address: studentAttendanceAddress, abi: studentAttendanceAbi, functionName: "admin" }),
-        publicClient.readContract({ address: studentAttendanceAddress, abi: studentAttendanceAbi, functionName: "nextSessionId" }),
-      ]);
+    try {
+      const result = await withTimeout(
+        (async () => {
+          const bytecode = await publicClient.getBytecode({
+            address: studentAttendanceAddress,
+          });
+          if (!bytecode || bytecode === "0x") {
+            throw new Error(
+              "No contract bytecode exists at the configured address on Sepolia.",
+            );
+          }
+
+          const [admin, nextSessionId] = await Promise.all([
+            publicClient.readContract({
+              address: studentAttendanceAddress,
+              abi: studentAttendanceAbi,
+              functionName: "admin",
+            }),
+            publicClient.readContract({
+              address: studentAttendanceAddress,
+              abi: studentAttendanceAbi,
+              functionName: "nextSessionId",
+            }),
+          ]);
+
+          return { admin, nextSessionId: nextSessionId.toString() };
+        })(),
+        DEPLOYMENT_CHECK_TIMEOUT_MS,
+      );
 
       setCheck({
         state: "passed",
-        message: "On-chain checks passed: contract bytecode exists and admin/session reads succeeded.",
-        admin,
-        nextSessionId: nextSessionId.toString(),
+        message:
+          "On-chain checks passed: contract bytecode exists and admin/session reads succeeded.",
+        admin: result.admin,
+        nextSessionId: result.nextSessionId,
       });
     } catch (error) {
       setCheck({
         state: "failed",
-        message: error instanceof Error ? error.message : "Could not verify the configured Sepolia deployment.",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Could not verify the configured Sepolia deployment. Check the RPC connection and retry.",
       });
     }
   }, [publicClient]);
@@ -75,33 +125,64 @@ export function DeploymentStatus() {
         <p className="panel-label">NETWORK · DEPLOYMENT CHECK</p>
         <h2 id="deployment-status-heading">Sepolia contract status</h2>
         {studentAttendanceAddress ? (
-          <p className="muted">Configured contract: <code>{studentAttendanceAddress}</code></p>
+          <p className="muted">
+            Configured contract: <code>{studentAttendanceAddress}</code>
+          </p>
         ) : null}
       </div>
 
-      <p className={check.state === "passed" ? "status-message" : check.state === "failed" ? "error-message" : "notice-message"} role="status" aria-live="polite">
+      <p
+        className={
+          check.state === "passed"
+            ? "status-message"
+            : check.state === "failed"
+              ? "error-message"
+              : "notice-message"
+        }
+        role="status"
+        aria-live="polite"
+      >
         {check.message}
       </p>
 
       {check.state === "passed" && (
         <div className="session-details">
-          <p><strong>Chain:</strong> Ethereum Sepolia ({sepolia.id})</p>
-          <p><strong>Administrator:</strong> <code>{check.admin}</code></p>
-          <p><strong>Next session ID:</strong> {check.nextSessionId}</p>
+          <p>
+            <strong>Chain:</strong> Ethereum Sepolia ({sepolia.id})
+          </p>
+          <p>
+            <strong>Administrator:</strong> <code>{check.admin}</code>
+          </p>
+          <p>
+            <strong>Next session ID:</strong> {check.nextSessionId}
+          </p>
         </div>
       )}
 
       {studentAttendanceAddress && (
         <div className="dashboard-actions">
-          <a className="explorer-link" href={`https://sepolia.etherscan.io/address/${studentAttendanceAddress}`} target="_blank" rel="noreferrer">
+          <a
+            className="explorer-link"
+            href={`https://sepolia.etherscan.io/address/${studentAttendanceAddress}`}
+            target="_blank"
+            rel="noreferrer"
+          >
             View contract on Sepolia Etherscan
           </a>
-          <button className="secondary-action" type="button" onClick={() => void verifyDeployment()} disabled={check.state === "checking"}>
+          <button
+            className="secondary-action"
+            type="button"
+            onClick={() => void verifyDeployment()}
+            disabled={check.state === "checking"}
+          >
             {check.state === "checking" ? "Checking…" : "Recheck deployment"}
           </button>
         </div>
       )}
-      <p className="muted">This check confirms runtime bytecode and two ABI reads. It does not mean the source code has been independently verified on Etherscan or audited.</p>
+      <p className="muted">
+        This check confirms runtime bytecode and two ABI reads. It does not mean
+        the source code has been independently verified on Etherscan or audited.
+      </p>
     </section>
   );
 }
