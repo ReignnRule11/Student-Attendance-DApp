@@ -24,6 +24,7 @@ A wallet-based attendance system built on **Ethereum Sepolia**. Instructors crea
 - [Configuration](#configuration)
 - [Validation and tests](#validation-and-tests)
 - [Sepolia deployment](#sepolia-deployment)
+- [End-to-end verification](#end-to-end-verification)
 - [Delivery progress](#delivery-progress)
 - [Contributing](#contributing)
 
@@ -172,6 +173,8 @@ These limitations must be considered before using the system for consequential a
 │       │       ├── contract/abi.ts
 │       │       ├── qr/attendance-payload.ts
 │       │       └── wallet/config.ts
+│       ├── tests/e2e/homepage.spec.ts
+│       ├── playwright.config.ts
 │       ├── package.json
 │       └── tsconfig.json
 ├── contracts/
@@ -185,6 +188,7 @@ These limitations must be considered before using the system for consequential a
 │   └── foundry.toml
 ├── docs/
 │   ├── DEPLOYMENT.md
+│   ├── END-TO-END-TESTING.md
 │   ├── PHASE-7-SECURITY-VALIDATION.md
 │   └── SECURITY.md
 ├── .env.example
@@ -218,6 +222,7 @@ Useful web checks:
 npm run lint
 npm run typecheck
 npm run build
+npm run test:e2e
 ```
 
 ### Build and test the contracts
@@ -263,27 +268,23 @@ GitHub Actions runs separate workflows for:
 
 - Solidity formatting, compilation, Foundry tests, fuzz tests, and invariant tests.
 - Web dependency installation, ESLint, TypeScript type-checking, and Next.js production build.
+- Playwright Chromium browser smoke tests against the production build.
 
 Workflow results:
 
 - [Contracts CI](https://github.com/ReignnRule11/Student-Attendance-DApp/actions/workflows/contracts-ci.yml)
 - [Web CI](https://github.com/ReignnRule11/Student-Attendance-DApp/actions/workflows/web-ci.yml)
+- [Web E2E Smoke](https://github.com/ReignnRule11/Student-Attendance-DApp/actions/workflows/web-e2e.yml)
 
-Passing CI demonstrates that the configured automated checks passed for a commit. It is not a substitute for an independent security audit or live end-to-end testing.
+The Playwright suite checks browser rendering and key page controls only. It does not connect real wallets, sign typed data, or submit transactions. Follow [docs/END-TO-END-TESTING.md](docs/END-TO-END-TESTING.md) for the live two-wallet Sepolia acceptance procedure. Passing CI is not a substitute for completing that procedure or obtaining an independent security audit.
 
 ## Sepolia deployment
 
 A Sepolia-only Foundry deployment script and controlled deployment runbook are included.
 
-**No live deployment is currently claimed.** Before broadcasting a deployment transaction:
+The contract is deployed at [0x66d5E20AFEA78C97BefC47FaCd462D93b888C703](https://sepolia.etherscan.io/address/0x66d5E20AFEA78C97BefC47FaCd462D93b888C703). The successful broadcast is recorded in [deployment workflow run #23](https://github.com/ReignnRule11/Student-Attendance-DApp/actions/runs/44317302407). The frontend has been configured for this address. This does not establish Etherscan source verification, an independent audit, or a completed live attendance acceptance test.
 
-1. Review [docs/SECURITY.md](docs/SECURITY.md) and [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
-2. Confirm the deployment script, contract behavior, and governance assumptions.
-3. Use a dedicated wallet funded only with Sepolia test ETH.
-4. Verify the RPC endpoint reports chain ID `11155111`.
-5. Confirm the expected deployer address before broadcasting.
-6. Verify the deployed source and address on Sepolia Etherscan.
-7. Run the documented post-deployment checks before configuring the frontend.
+For the next release gate, follow [docs/END-TO-END-TESTING.md](docs/END-TO-END-TESTING.md) and retain transaction-level evidence for the two-wallet Sepolia flow.
 
 The deployer becomes the initial administrator. Protect that wallet carefully; administrator handover is possible only while the current administrator can authorize a proposal.
 
@@ -300,15 +301,17 @@ The deployer becomes the initial administrator. Protect that wallet carefully; a
 | 7 | Fuzz, invariant, and security validation | Merged |
 | 8 | Sepolia deployment tooling and deployment runbook | Merged |
 | 9 | Two-step admin handover and instructor-revocation enforcement | Merged |
+| 10 | Sepolia contract deployment and frontend configuration | Merged |
+| 11 | Playwright browser smoke tests and live Sepolia acceptance runbook | In review |
 
 ### Remaining release work
 
-- Complete browser-level and Anvil end-to-end integration tests.
+- Complete the live two-wallet Sepolia acceptance test and retain transaction evidence.
+- Add deeper browser/wallet integration coverage; current Playwright tests are smoke tests only.
 - Triage and resolve dependency security advisories.
 - Review operational controls and consider multisig administration.
 - Obtain an independent smart-contract security audit.
-- Perform a controlled Sepolia deployment and verify the deployed contract.
-- Configure and test the frontend against the verified deployment.
+- Verify contract source on Sepolia Etherscan and validate the hosted frontend deployment.
 
 ## Contributing
 
