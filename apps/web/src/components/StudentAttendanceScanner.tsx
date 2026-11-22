@@ -6,7 +6,15 @@ import { useAccount, useChainId, usePublicClient, useWriteContract } from "wagmi
 import { sepolia } from "wagmi/chains";
 import { studentAttendanceAbi } from "../lib/contract/abi";
 import { isStudentAttendanceConfigured, studentAttendanceAddress } from "../lib/contract/deployment";
+import {
+  assertSuccessfulReceipt,
+  clearPendingTransaction,
+  loadPendingTransaction,
+  savePendingTransaction,
+} from "../lib/contract/transactions";
 import { parseAttendanceQrPayload } from "../lib/qr/attendance-payload";
+
+const SCANNER_TX_SCOPE = "student-attendance";
 
 export function StudentAttendanceScanner() {
   const { address, isConnected } = useAccount();
@@ -14,8 +22,18 @@ export function StudentAttendanceScanner() {
   const publicClient = usePublicClient();
   const { writeContractAsync, isPending } = useWriteContract();
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const scannerOpRef = useRef<"idle" | "starting" | "stopping">("idle");
+  const mountedRef = useRef(true);
+  const isSubmittingRef = useRef(false);
+  const activeAddressRef = useRef(address);
+
+  useEffect(() => {
+    activeAddressRef.current = address;
+  }, [address]);
+
   const [rawQr, setRawQr] = useState("");
   const [cameraActive, setCameraActive] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [transactionHash, setTransactionHash] = useState("");
@@ -24,17 +42,61 @@ export function StudentAttendanceScanner() {
   const contractConfigured = isStudentAttendanceConfigured;
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       const scanner = scannerRef.current;
+      scannerRef.current = null;
       if (scanner?.isScanning) {
         void scanner.stop().then(() => scanner.clear()).catch(() => undefined);
       }
     };
   }, []);
 
+  useEffect(() => {
+    if (!publicClient || !address || chainId !== sepolia.id || !contractConfigured) return;
+    const pending = loadPendingTransaction(SCANNER_TX_SCOPE);
+    if (!pending || pending.address.toLowerCase() !== address.toLowerCase()) return;
+
+    let cancelled = false;
+
+    void (async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+      setTransactionHash(pending.hash);
+      setStatus("Recovering pending attendance transaction from Sepolia…");
+      try {
+        const receipt = await publicClient.waitForTransactionReceipt({ hash: pending.hash });
+        if (cancelled) return;
+        clearPendingTransaction(SCANNER_TX_SCOPE);
+        assertSuccessfulReceipt(receipt, "Recovered transaction reverted on-chain. Attendance was not recorded.");
+        setStatus("Recovered attendance transaction confirmed on Sepolia.");
+      } catch (recoveryError) {
+        if (cancelled) return;
+        clearPendingTransaction(SCANNER_TX_SCOPE);
+        setStatus("");
+        setError(
+          recoveryError instanceof Error
+            ? recoveryError.message
+            : "Could not confirm pending attendance transaction. Check Sepolia Etherscan.",
+        );
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [address, chainId, contractConfigured, publicClient]);
+
   async function stopScanner() {
+    if (scannerOpRef.current === "stopping") return;
     const scanner = scannerRef.current;
-    if (!scanner) return;
+    if (!scanner) {
+      scannerOpRef.current = "idle";
+      setCameraActive(false);
+      return;
+    }
+    scannerOpRef.current = "stopping";
     try {
       if (scanner.isScanning) await scanner.stop();
       await scanner.clear();
@@ -42,11 +104,14 @@ export function StudentAttendanceScanner() {
       // Camera may already have stopped after a successful scan.
     } finally {
       scannerRef.current = null;
-      setCameraActive(false);
+      scannerOpRef.current = "idle";
+      if (mountedRef.current) setCameraActive(false);
     }
   }
 
   async function startScanner() {
+    if (scannerOpRef.current !== "idle" || scannerRef.current) return;
+    scannerOpRef.current = "starting";
     setError("");
     setStatus("");
     try {
@@ -62,15 +127,26 @@ export function StudentAttendanceScanner() {
         },
         () => undefined,
       );
+      if (!mountedRef.current || scannerOpRef.current !== "starting") {
+        if (scanner.isScanning) await scanner.stop().catch(() => undefined);
+        await Promise.resolve(scanner.clear()).catch(() => undefined);
+        scannerRef.current = null;
+        return;
+      }
+      scannerOpRef.current = "idle";
       setCameraActive(true);
     } catch (cameraError) {
       scannerRef.current = null;
-      setCameraActive(false);
-      setError(cameraError instanceof Error ? cameraError.message : "Camera could not start. Paste the QR payload instead.");
+      scannerOpRef.current = "idle";
+      if (mountedRef.current) {
+        setCameraActive(false);
+        setError(cameraError instanceof Error ? cameraError.message : "Camera could not start. Paste the QR payload instead.");
+      }
     }
   }
 
   async function submitAttendance() {
+    if (isSubmittingRef.current) return;
     setError("");
     setStatus("");
     setTransactionHash("");
@@ -87,6 +163,10 @@ export function StudentAttendanceScanner() {
       setError("The Sepolia contract address is not configured yet.");
       return;
     }
+
+    const submittingAddress = address;
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
 
     try {
       const payload = parseAttendanceQrPayload(rawQr.trim());
@@ -106,7 +186,7 @@ export function StudentAttendanceScanner() {
           address: configuredAddress as `0x${string}`,
           abi: studentAttendanceAbi,
           functionName: "registeredStudents",
-          args: [address],
+          args: [submittingAddress],
         }),
         publicClient.readContract({
           address: configuredAddress as `0x${string}`,
@@ -118,7 +198,7 @@ export function StudentAttendanceScanner() {
           address: configuredAddress as `0x${string}`,
           abi: studentAttendanceAbi,
           functionName: "hasAttended",
-          args: [sessionId, address],
+          args: [sessionId, submittingAddress],
         }),
       ]);
 
@@ -132,6 +212,10 @@ export function StudentAttendanceScanner() {
       if (expiresAt > endsAt) throw new Error("The QR expiry exceeds the session end time.");
       if (qrNonce !== currentNonce) throw new Error("This QR has been invalidated. Ask the instructor for a new one.");
 
+      if (activeAddressRef.current?.toLowerCase() !== submittingAddress.toLowerCase()) {
+        throw new Error("Connected wallet changed during pre-checks. Review your account and retry.");
+      }
+
       setStatus("Pre-checks passed. Confirm the attendance transaction in your wallet.");
       const hash = await writeContractAsync({
         address: configuredAddress as `0x${string}`,
@@ -140,13 +224,29 @@ export function StudentAttendanceScanner() {
         args: [sessionId, expiresAt, qrNonce, payload.signature],
       });
       setTransactionHash(hash);
+      savePendingTransaction(SCANNER_TX_SCOPE, {
+        hash,
+        address: submittingAddress,
+        label: `Attendance for session #${payload.sessionId}`,
+        createdAt: Date.now(),
+      });
       setStatus("Transaction submitted. Waiting for Sepolia confirmation…");
-      await publicClient.waitForTransactionReceipt({ hash });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: 60_000 });
+      clearPendingTransaction(SCANNER_TX_SCOPE);
+      assertSuccessfulReceipt(receipt, "Transaction reverted on-chain. Attendance was not recorded.");
+      if (activeAddressRef.current?.toLowerCase() !== submittingAddress.toLowerCase()) {
+        setStatus("");
+        setError("Wallet changed while the transaction was confirming. Verify attendance for the original wallet on Etherscan.");
+        return;
+      }
       setStatus("Attendance confirmed on Sepolia.");
       setRawQr("");
     } catch (submissionError) {
       setStatus("");
       setError(submissionError instanceof Error ? submissionError.message : "Attendance submission failed.");
+    } finally {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
     }
   }
 
@@ -181,8 +281,8 @@ export function StudentAttendanceScanner() {
           onChange={(event) => setRawQr(event.target.value)}
           placeholder="Paste the complete signed attendance QR payload"
         />
-        <button className="primary-action" onClick={submitAttendance} disabled={!contractConfigured || !rawQr.trim() || !isConnected || isPending}>
-          {isPending ? "Confirm in wallet…" : "Submit attendance"}
+        <button className="primary-action" onClick={submitAttendance} disabled={!contractConfigured || !rawQr.trim() || !isConnected || isPending || isSubmitting}>
+          {isPending ? "Confirm in wallet…" : isSubmitting ? "Confirming on Sepolia…" : "Submit attendance"}
         </button>
         {status && <p className="status-message" role="status">{status}</p>}
         {error && <p className="error-message" role="alert">{error}</p>}

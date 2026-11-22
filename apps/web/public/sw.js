@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "student-attendance-pwa-";
-const CACHE_NAME = `${CACHE_PREFIX}v1`;
+const CACHE_NAME = `${CACHE_PREFIX}v2`;
 const APP_SHELL_URL = new URL("./", self.registration.scope).href;
 const SCOPE_PATH = new URL(self.registration.scope).pathname;
 

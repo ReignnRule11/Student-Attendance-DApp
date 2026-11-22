@@ -13,9 +13,29 @@ export function PwaControls() {
 
   useEffect(() => {
     if ("serviceWorker" in navigator) {
-      const workerUrl = new URL("./sw.js", window.location.href);
-      const scope = new URL("./", window.location.href).pathname;
-      void navigator.serviceWorker.register(workerUrl, { scope }).catch(() => undefined);
+      if (process.env.NODE_ENV === "production") {
+        const workerUrl = new URL("./sw.js", window.location.href);
+        const scope = new URL("./", window.location.href).pathname;
+        void navigator.serviceWorker.register(workerUrl, { scope }).catch(() => undefined);
+      } else {
+        // Unregister any previously installed SW in dev so Next.js dev chunks are never served stale.
+        void navigator.serviceWorker
+          .getRegistrations()
+          .then((regs) => Promise.all(regs.map((r) => r.unregister())))
+          .catch(() => undefined);
+        if ("caches" in window) {
+          void caches
+            .keys()
+            .then((keys) =>
+              Promise.all(
+                keys
+                  .filter((key) => key.startsWith("student-attendance-pwa-"))
+                  .map((key) => caches.delete(key)),
+              ),
+            )
+            .catch(() => undefined);
+        }
+      }
     }
 
     const handleInstallPrompt = (event: Event) => {

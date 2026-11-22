@@ -1,5 +1,7 @@
 import { isAddress, isHex } from "viem";
 
+export const MAX_QR_PAYLOAD_LENGTH = 4096;
+
 export type AttendanceQrPayload = {
   version: 1;
   chainId: 11155111;
@@ -11,8 +13,21 @@ export type AttendanceQrPayload = {
 };
 
 export function parseAttendanceQrPayload(raw: string): AttendanceQrPayload {
-  const value: unknown = JSON.parse(raw);
-  if (!value || typeof value !== "object") {
+  if (typeof raw !== "string" || raw.length === 0) {
+    throw new Error("QR data is empty.");
+  }
+  if (raw.length > MAX_QR_PAYLOAD_LENGTH) {
+    throw new Error("QR payload exceeds the maximum allowed size.");
+  }
+
+  let value: unknown;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    throw new Error("QR data is not valid JSON.");
+  }
+
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("QR data is not a valid attendance payload.");
   }
 
