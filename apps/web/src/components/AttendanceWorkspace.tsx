@@ -163,7 +163,6 @@ export function AttendanceWorkspace() {
     setSession(null);
     try {
       const result = await publicClient.readContract({
-        account: submittingAddress,
         address: contractAddress as `0x${string}`,
         abi: studentAttendanceAbi,
         functionName: "sessions",
