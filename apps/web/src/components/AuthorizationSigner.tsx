@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { useAccount, useChainId, usePublicClient, useSignTypedData } from "wagmi";
 import { studentAttendanceAbi } from "../lib/contract/abi";
@@ -15,26 +15,64 @@ const attendanceTypes = {
   ],
 } as const;
 
-export function AuthorizationSigner() {
+type SelectedSession = {
+  id: string;
+  qrNonce: string;
+  endsAt: bigint;
+};
+
+const EXPIRY_PRESETS = [
+  { label: "5 min", seconds: 5 * 60 },
+  { label: "15 min", seconds: 15 * 60 },
+  { label: "30 min", seconds: 30 * 60 },
+] as const;
+
+function computePresetExpiry(offsetSeconds: number, maxEndsAt?: bigint): string {
+  const target = Math.floor(Date.now() / 1000) + offsetSeconds;
+  if (maxEndsAt !== undefined && BigInt(target) > maxEndsAt) {
+    return maxEndsAt.toString();
+  }
+  return String(target);
+}
+
+export function AuthorizationSigner({
+  selectedSession,
+}: {
+  selectedSession?: SelectedSession | null;
+}) {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const publicClient = usePublicClient();
   const { signTypedDataAsync, isPending, error } = useSignTypedData();
-  const [sessionId, setSessionId] = useState("1");
-  const [qrNonce, setQrNonce] = useState("1");
+  const [sessionId, setSessionId] = useState(selectedSession?.id || "1");
+  const [qrNonce, setQrNonce] = useState(selectedSession?.qrNonce || "1");
   const [expiresAt, setExpiresAt] = useState("");
   const [signature, setSignature] = useState("");
   const [qrPayload, setQrPayload] = useState("");
   const [localError, setLocalError] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!selectedSession) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSessionId(selectedSession.id);
+    setQrNonce(selectedSession.qrNonce);
+  }, [selectedSession]);
 
   const contractAddress = studentAttendanceAddress;
   const validContractAddress = isStudentAttendanceConfigured;
   const canSign = isConnected && chainId === sepolia.id && validContractAddress;
 
+  function applyPreset(offsetSeconds: number) {
+    setExpiresAt(computePresetExpiry(offsetSeconds, selectedSession?.endsAt));
+    setLocalError("");
+  }
+
   async function handleSign() {
     setSignature("");
     setQrPayload("");
     setLocalError("");
+    setCopied(false);
     if (!canSign || !contractAddress) return;
 
     try {
@@ -52,7 +90,7 @@ export function AuthorizationSigner() {
         throw new Error("Session ID must be positive; nonce and expiry must fit uint64.");
       }
       if (expiry <= BigInt(Math.floor(Date.now() / 1000))) {
-        throw new Error("Expiry must be a future Unix timestamp.");
+        throw new Error("Expiry must be in the future. Pick a preset or a future timestamp.");
       }
 
       if (!publicClient || !address) throw new Error("Sepolia RPC is unavailable. Try again.");
@@ -112,66 +150,122 @@ export function AuthorizationSigner() {
     }
   }
 
+  const expiryPreview =
+    /^\d+$/.test(expiresAt.trim()) && Number(expiresAt) > 0
+      ? new Date(Number(expiresAt) * 1000).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : null;
+
   return (
-    <section className="integration-panel signer-panel" aria-labelledby="signer-heading">
-      <div>
-        <p className="panel-label">INSTRUCTOR TOOL · EIP-712 + QR</p>
-        <h2 id="signer-heading">Create a signed attendance QR</h2>
+    <article className="dashboard-card signer-card" aria-labelledby="signer-heading">
+      <div className="card-header">
+        <p className="panel-label">QR AUTHORIZATION</p>
+        <h3 id="signer-heading">Generate attendance QR</h3>
         <p className="muted">
-          Sign the exact fields enforced by the contract, then display the resulting QR
-          for students. The same QR can serve multiple students until it expires or its
-          nonce is rotated. No transaction is sent by the instructor signing step.
+          Sign a gas-free authorization for students to scan. Valid for multiple students until expiry or nonce rotation.
         </p>
       </div>
 
       <div className="signer-fields">
+        <div className="field-row">
+          <label>
+            Session ID
+            <input inputMode="numeric" value={sessionId} onChange={(event) => setSessionId(event.target.value)} />
+          </label>
+          <label>
+            QR nonce
+            <input inputMode="numeric" value={qrNonce} onChange={(event) => setQrNonce(event.target.value)} />
+          </label>
+        </div>
+
+        <div className="preset-group">
+          <span className="field-label">QR validity</span>
+          <div className="preset-row">
+            {EXPIRY_PRESETS.map((preset) => (
+              <button
+                key={preset.label}
+                type="button"
+                className="preset-chip"
+                onClick={() => applyPreset(preset.seconds)}
+              >
+                {preset.label}
+              </button>
+            ))}
+            {selectedSession && (
+              <button
+                type="button"
+                className="preset-chip"
+                onClick={() => setExpiresAt(selectedSession.endsAt.toString())}
+              >
+                Session end
+              </button>
+            )}
+          </div>
+        </div>
+
         <label>
-          Session ID
-          <input inputMode="numeric" value={sessionId} onChange={(event) => setSessionId(event.target.value)} />
-        </label>
-        <label>
-          QR nonce
-          <input inputMode="numeric" value={qrNonce} onChange={(event) => setQrNonce(event.target.value)} />
-        </label>
-        <label>
-          Expiry (Unix seconds)
-          <input inputMode="numeric" placeholder="e.g. 1790000000" value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} />
+          Expiry timestamp {expiryPreview ? `(until ${expiryPreview})` : ""}
+          <input
+            inputMode="numeric"
+            placeholder="Pick a preset above or enter Unix seconds"
+            value={expiresAt}
+            onChange={(event) => setExpiresAt(event.target.value)}
+          />
         </label>
       </div>
 
       {!validContractAddress && (
         <p className="notice-message">
-          Set NEXT_PUBLIC_CONTRACT_ADDRESS to the deployed Sepolia contract address before signing.
+          Contract address is not configured.
         </p>
       )}
       {isConnected && chainId !== sepolia.id && (
         <p className="notice-message">Switch your wallet to Sepolia before signing.</p>
       )}
 
-      <button className="primary-action" onClick={handleSign} disabled={!canSign || isPending || !expiresAt.trim()}>
+      <button
+        type="button"
+        className="primary-action"
+        onClick={handleSign}
+        disabled={!canSign || isPending || !expiresAt.trim()}
+      >
         {isPending ? "Waiting for wallet…" : "Sign and generate QR"}
       </button>
 
-      {(localError || error?.message) && <p className="error-message" role="alert">{localError || error?.message}</p>}
+      {(localError || error?.message) && (
+        <p className="error-message" role="alert">
+          {localError || error?.message}
+        </p>
+      )}
+
       {qrPayload && (
         <div className="qr-result">
           <div className="qr-code-surface">
-            <QRCodeSVG value={qrPayload} size={240} level="M" includeMargin />
+            <QRCodeSVG value={qrPayload} size={220} level="M" includeMargin />
           </div>
-          <div>
-            <p className="panel-label">SIGNED QR READY</p>
-            <p className="muted">Display this code to students. It contains no student names or personal data.</p>
-            <button className="secondary-action" onClick={() => navigator.clipboard.writeText(qrPayload)}>
-              Copy QR payload
+          <div className="qr-result-actions">
+            <p className="panel-label">QR READY FOR STUDENTS</p>
+            <p className="muted">Display this code on screen. No student PII is included.</p>
+            <button
+              type="button"
+              className="secondary-action"
+              onClick={() => {
+                void navigator.clipboard.writeText(qrPayload);
+                setCopied(true);
+              }}
+            >
+              {copied ? "Copied payload" : "Copy QR payload"}
             </button>
           </div>
           <details>
-            <summary>View signature</summary>
+            <summary>Signature details</summary>
             <code>{signature}</code>
           </details>
         </div>
       )}
-      {!address && <p className="muted">Connect an authorized instructor wallet to enable signing.</p>}
-    </section>
+      {!address && <p className="muted">Connect an authorized instructor wallet to sign.</p>}
+    </article>
   );
 }

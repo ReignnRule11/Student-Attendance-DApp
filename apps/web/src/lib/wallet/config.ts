@@ -1,9 +1,10 @@
 import { fallback, http } from "viem";
 import { createConfig } from "wagmi";
-import { injected } from "@wagmi/core";
+import { injected, walletConnect } from "wagmi/connectors";
 import { sepolia } from "wagmi/chains";
 
 const rpcUrl = process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL;
+const walletConnectProjectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID?.trim();
 
 const rpcOptions = {
   timeout: 6_000,
@@ -19,9 +20,27 @@ const rpcTransports = [
   http("https://sepolia.gateway.tenderly.co", rpcOptions),
 ];
 
+const connectors = [
+  injected(),
+  ...(walletConnectProjectId
+    ? [
+        walletConnect({
+          projectId: walletConnectProjectId,
+          showQrModal: true,
+          metadata: {
+            name: "Student Attendance DApp",
+            description: "Wallet-based student attendance on Ethereum Sepolia.",
+            url: "https://student-attendance-dapp.vercel.app",
+            icons: [],
+          },
+        }),
+      ]
+    : []),
+];
+
 export const walletConfig = createConfig({
   chains: [sepolia],
-  connectors: [injected()],
+  connectors,
   transports: {
     [sepolia.id]: fallback(rpcTransports),
   },
