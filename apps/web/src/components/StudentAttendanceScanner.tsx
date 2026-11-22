@@ -73,8 +73,8 @@ export function StudentAttendanceScanner() {
         setStatus("Recovered attendance transaction confirmed on Sepolia.");
       } catch (recoveryError) {
         if (cancelled) return;
-        clearPendingTransaction(SCANNER_TX_SCOPE);
-        setStatus("");
+        // Preserve pending state when confirmation is unavailable for later recovery.
+        setStatus("Transaction confirmation is still unknown. The pending record was kept for recovery.");
         setError(
           recoveryError instanceof Error
             ? recoveryError.message
@@ -218,6 +218,7 @@ export function StudentAttendanceScanner() {
 
       setStatus("Pre-checks passed. Confirm the attendance transaction in your wallet.");
       const hash = await writeContractAsync({
+        account: submittingAddress,
         address: configuredAddress as `0x${string}`,
         abi: studentAttendanceAbi,
         functionName: "markAttendance",
