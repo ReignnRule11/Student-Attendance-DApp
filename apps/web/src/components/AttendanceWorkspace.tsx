@@ -139,8 +139,8 @@ export function AttendanceWorkspace() {
         await loadRoles();
       } catch (recoveryError) {
         if (cancelled) return;
-        clearPendingTransaction(DASHBOARD_TX_SCOPE);
-        setStatus("");
+        // Keep pending state when confirmation is unavailable for later recovery.
+        setStatus("Transaction confirmation is still unknown. The pending record was kept for recovery.");
         setError(
           recoveryError instanceof Error
             ? recoveryError.message
@@ -163,6 +163,7 @@ export function AttendanceWorkspace() {
     setSession(null);
     try {
       const result = await publicClient.readContract({
+        account: submittingAddress,
         address: contractAddress as `0x${string}`,
         abi: studentAttendanceAbi,
         functionName: "sessions",
@@ -264,6 +265,7 @@ export function AttendanceWorkspace() {
     setLastTransaction("");
     try {
       const hash = await writeContractAsync({
+        account: submittingAddress,
         address: contractAddress as `0x${string}`,
         abi: studentAttendanceAbi,
         functionName: "createSession",
