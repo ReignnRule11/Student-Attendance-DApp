@@ -130,7 +130,7 @@ def test_owner_can_manage_members_and_admin_cannot_escalate(client):
     asyncio.run(add_membership_fixture(organization_id, admin, "admin"))
     login(client, student)
     asyncio.run(add_membership_fixture(organization_id, student, "student"))
-    login(client, owner)
+    owner_csrf = login(client, owner)
     headers = {"X-CSRF-Token": owner_csrf}
 
     granted = client.put(
@@ -156,10 +156,11 @@ def test_owner_can_manage_members_and_admin_cannot_escalate(client):
     )
     assert lower_role.status_code == 200
 
-    # Owner cannot be demoted or revoked by another admin.
+    # An admin cannot revoke the owner.
+    admin_csrf = login(client, admin)
     protected = client.delete(
         f"/organizations/{organization_id}/members/{owner.address}",
-        headers={"X-CSRF-Token": client.cookies.get("attendance_csrf")},
+        headers={"X-CSRF-Token": admin_csrf},
     )
     assert protected.status_code == 403
 
