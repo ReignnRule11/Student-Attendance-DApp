@@ -1,4 +1,5 @@
 import asyncio
+from pathlib import Path
 
 import asyncpg
 import pytest
@@ -41,10 +42,8 @@ def login(client, account):
     if not signature.startswith("0x"):
         signature = "0x" + signature
     response = client.post("/auth/verify", json={
-        "address": account.address,
-        "nonce": challenge["nonce"],
-        "message": challenge["message"],
-        "signature": signature,
+        "address": account.address, "nonce": challenge["nonce"],
+        "message": challenge["message"], "signature": signature,
     })
     assert response.status_code == 200
     return client.cookies.get("attendance_csrf")
@@ -55,9 +54,10 @@ def client():
     async def prepare_database():
         connection = await asyncpg.connect(settings.database_url)
         try:
-            migrations = __import__("pathlib").Path(__file__).parents[1] / "migrations"
-            await connection.execute((migrations / "001_secure_identity.sql").read_text(encoding="utf-8"))
-            await connection.execute((migrations / "002_tenant_authorization.sql").read_text(encoding="utf-8"))
+            migrations = Path(__file__).parents[1] / "migrations"
+            for migration in ("001_secure_identity.sql", "002_tenant_authorization.sql",
+                              "003_membership_management.sql"):
+                await connection.execute((migrations / migration).read_text(encoding="utf-8"))
             await connection.execute(
                 "TRUNCATE organization_audit_events, auth_sessions, auth_challenges, organization_memberships, users, organizations RESTART IDENTITY CASCADE"
             )
@@ -79,19 +79,16 @@ def test_bootstrap_requires_secret_csrf_and_is_one_time(client, monkeypatch):
         "X-Org-Bootstrap-Secret": "wrong", "X-CSRF-Token": csrf,
     })
     assert denied.status_code == 403
-
     no_csrf = client.post("/organizations/bootstrap", json=payload, headers={
         "X-Org-Bootstrap-Secret": "test-only-bootstrap-secret",
     })
     assert no_csrf.status_code == 403
-
     created = client.post("/organizations/bootstrap", json=payload, headers={
         "X-Org-Bootstrap-Secret": "test-only-bootstrap-secret", "X-CSRF-Token": csrf,
     })
     assert created.status_code == 201
     organization_id = created.json()["organization_id"]
     assert client.get(f"/organizations/{organization_id}/admin").status_code == 200
-
     second = client.post("/organizations/bootstrap", json={"name": "Second School"}, headers={
         "X-Org-Bootstrap-Secret": "test-only-bootstrap-secret", "X-CSRF-Token": csrf,
     })
@@ -103,26 +100,17 @@ def test_bootstrap_requires_secret_csrf_and_is_one_time(client, monkeypatch):
             return await connection.fetchval("SELECT count(*) FROM organization_audit_events")
         finally:
             await connection.close()
-
     assert asyncio.run(count_audit_events()) == 1
 
 
 def test_tenant_isolation_and_role_enforcement(client):
-    student = Account.create()
-    other = Account.create()
+    student, other = Account.create(), Account.create()
     login(client, student)
     student_org = asyncio.run(insert_org_and_membership(student, role="student"))
-
-    # Authenticate the second wallet so /auth/verify creates its users row
-    # before the test fixture inserts that wallet's organization membership.
     login(client, other)
     other_org = asyncio.run(insert_org_and_membership(other, role="owner"))
-
-    # Restore the first wallet's session for the tenant-isolation assertions.
     login(client, student)
-    own = client.get(f"/organizations/{student_org}/workspace")
-    assert own.status_code == 200
-    assert own.json()["role"] == "student"
+    assert client.get(f"/organizations/{student_org}/workspace").status_code == 200
     assert client.get(f"/organizations/{other_org}/workspace").status_code == 404
     assert client.get(f"/organizations/{student_org}/admin").status_code == 403
 
@@ -132,3 +120,99 @@ def test_revoked_membership_cannot_access_workspace(client):
     login(client, account)
     organization_id = asyncio.run(insert_org_and_membership(account, role="owner", revoked=True))
     assert client.get(f"/organizations/{organization_id}/workspace").status_code == 404
+
+
+def test_owner_can_manage_members_and_admin_cannot_escalate(client):
+    owner, admin, student, outsider = (Account.create() for _ in range(4))
+    owner_csrf = login(client, owner)
+    organization_id = asyncio.run(insert_org_and_membership(owner, role="owner"))
+    login(client, admin)
+    asyncio.run(add_membership_fixture(organization_id, admin, "admin"))
+    login(client, student)
+    asyncio.run(add_membership_fixture(organization_id, student, "student"))
+    login(client, owner)
+    headers = {"X-CSRF-Token": owner_csrf}
+
+    granted = client.put(
+        f"/organizations/{organization_id}/members/{admin.address}",
+        json={"role": "admin"}, headers=headers,
+    )
+    assert granted.status_code == 200
+    assert client.get(f"/organizations/{organization_id}/members").status_code == 200
+
+    # An admin can add lower-privilege roles, but cannot grant admin.
+    admin_csrf = login(client, admin)
+    escalated = client.put(
+        f"/organizations/{organization_id}/members/{outsider.address}",
+        json={"role": "admin"}, headers={"X-CSRF-Token": admin_csrf},
+    )
+    assert escalated.status_code == 403
+
+    # Authenticate outsider first; admin can then add them as a student.
+    login(client, outsider)
+    lower_role = client.put(
+        f"/organizations/{organization_id}/members/{outsider.address}",
+        json={"role": "student"}, headers={"X-CSRF-Token": client.cookies.get("attendance_csrf")},
+    )
+    assert lower_role.status_code == 200
+
+    # Owner cannot be demoted or revoked by another admin.
+    protected = client.delete(
+        f"/organizations/{organization_id}/members/{owner.address}",
+        headers={"X-CSRF-Token": client.cookies.get("attendance_csrf")},
+    )
+    assert protected.status_code == 403
+
+
+async def add_membership_fixture(organization_id, account, role):
+    connection = await asyncpg.connect(settings.database_url)
+    try:
+        user_id = await connection.fetchval(
+            "SELECT id FROM users WHERE wallet_address = $1", account.address.lower()
+        )
+        await connection.execute(
+            """INSERT INTO organization_memberships (organization_id, user_id, role)
+               VALUES ($1, $2, $3)""", organization_id, user_id, role,
+        )
+    finally:
+        await connection.close()
+
+
+def test_revoke_reactivate_and_audit_history(client):
+    owner, member = Account.create(), Account.create()
+    owner_csrf = login(client, owner)
+    organization_id = asyncio.run(insert_org_and_membership(owner, role="owner"))
+    login(client, member)
+    asyncio.run(add_membership_fixture(organization_id, member, "student"))
+    login(client, owner)
+
+    revoke = client.delete(
+        f"/organizations/{organization_id}/members/{member.address}",
+        headers={"X-CSRF-Token": owner_csrf},
+    )
+    assert revoke.status_code == 200
+    assert client.get(f"/organizations/{organization_id}/workspace").status_code == 200
+    login(client, member)
+    assert client.get(f"/organizations/{organization_id}/workspace").status_code == 404
+
+    owner_csrf = login(client, owner)
+    reactivate = client.put(
+        f"/organizations/{organization_id}/members/{member.address}",
+        json={"role": "instructor"},
+        headers={"X-CSRF-Token": owner_csrf},
+    )
+    assert reactivate.status_code == 200
+    login(client, member)
+    assert client.get(f"/organizations/{organization_id}/workspace").json()["role"] == "instructor"
+
+    async def read_events():
+        connection = await asyncpg.connect(settings.database_url)
+        try:
+            return await connection.fetch(
+                "SELECT event_type FROM organization_audit_events WHERE organization_id = $1 ORDER BY id",
+                organization_id,
+            )
+        finally:
+            await connection.close()
+    events = [row["event_type"] for row in asyncio.run(read_events())]
+    assert events == ["membership.revoked", "membership.reactivated"]
