@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: student-attendance-api
+    runtime: docker
+    rootDir: apps/api
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /ready
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: API_ALLOWED_ORIGINS
+        sync: false
+      - key: SIWE_DOMAIN
+        sync: false
+      - key: SIWE_URI
+        sync: false
+      - key: ORG_BOOTSTRAP_SECRET
+        sync: false
+      - key: SEPOLIA_RPC_URL
+        sync: false
+      - key: ATTENDANCE_CONTRACT_ADDRESS
+        value: 0x66d5E20AFEA78C97BefC47FaCd462D93b888C703
+      - key: SIWE_CHAIN_ID
+        value: "11155111"
