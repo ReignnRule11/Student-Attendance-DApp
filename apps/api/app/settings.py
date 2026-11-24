@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     siwe_domain: str = "localhost"
     siwe_uri: str = "http://localhost:3000"
     siwe_chain_id: int = 11155111
+    org_bootstrap_secret: str = ""
 
 
 settings = Settings()
