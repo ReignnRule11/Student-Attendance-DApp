@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from app.settings import settings
 from app.database import check_database
 from app.auth import router as auth_router
+from app.organizations import router as organizations_router
 
 app = FastAPI(
     title="Student Attendance API",
@@ -21,6 +22,7 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
+app.include_router(organizations_router)
 
 
 @app.get("/health", tags=["health"])
