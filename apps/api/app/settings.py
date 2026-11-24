@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     siwe_uri: str = "http://localhost:3000"
     siwe_chain_id: int = 11155111
     org_bootstrap_secret: str = ""
+    sepolia_rpc_url: str = ""
+    attendance_contract_address: str = "0x66d5E20AFEA78C97BefC47FaCd462D93b888C703"
 
 
 settings = Settings()

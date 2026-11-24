@@ -18,10 +18,13 @@ def client():
     async def prepare_database():
         connection = await asyncpg.connect(settings.database_url)
         try:
-            for name in ("001_secure_identity.sql", "004_auth_rate_limits.sql"):
+            audit_table_exists = await connection.fetchval("SELECT to_regclass('organization_audit_events') IS NOT NULL")
+            if audit_table_exists:
+                await connection.execute("TRUNCATE organization_audit_events")
+            for name in ("001_secure_identity.sql", "002_tenant_authorization.sql", "003_membership_management.sql", "004_auth_rate_limits.sql", "005_attendance_sessions.sql"):
                 await connection.execute((migrations / name).read_text(encoding="utf-8"))
             await connection.execute(
-                "TRUNCATE auth_rate_limits, auth_sessions, auth_challenges, organization_memberships, users, organizations RESTART IDENTITY CASCADE"
+                "TRUNCATE attendance_sessions, organization_audit_events, auth_rate_limits, auth_sessions, auth_challenges, organization_memberships, users, organizations RESTART IDENTITY CASCADE"
             )
         finally:
             await connection.close()

@@ -21,6 +21,7 @@ Apply migrations in numeric order using a trusted deployment/operator connection
 2. `migrations/002_tenant_authorization.sql`
 3. `migrations/003_membership_management.sql`
 4. `migrations/004_auth_rate_limits.sql`
+5. `migrations/005_attendance_sessions.sql`
 
 Application startup does not apply schema changes. Do not expose the organization bootstrap secret to browser clients.
 
@@ -36,5 +37,9 @@ Nonce issuance is limited to 30 requests per source IP and 5 per wallet per 15-m
 - `GET /ready`: PostgreSQL readiness.
 - `POST /auth/nonce`, `POST /auth/verify`, `GET /auth/me`, `POST /auth/logout`.
 - Organization bootstrap, workspace, admin, and membership endpoints are tenant-scoped and require the documented session/CSRF controls.
+- `POST /organizations/{organization_id}/attendance-sessions`: register a session only after verifying its mined Sepolia `SessionCreated` event, transaction target, sender, chain ID, and event fields. Requires an active owner/admin/instructor membership and CSRF validation.
+- `GET /organizations/{organization_id}/attendance-sessions`: list sessions registered to the caller’s organization.
 
-This backend foundation does not yet implement course, enrollment, attendance-session, QR, or blockchain-indexer APIs. Do not treat successful CI as production deployment or as live wallet/attendance acceptance.
+Set `SEPOLIA_RPC_URL` to a trusted Sepolia JSON-RPC endpoint. The contract address defaults to the currently documented Sepolia deployment and can be overridden with `ATTENDANCE_CONTRACT_ADDRESS`. The API does not sign QR authorizations or record attendance: instructor EIP-712 signing and student attendance transactions remain wallet-to-contract operations. The smart contract remains authoritative; this API stores a tenant-scoped projection of confirmed `SessionCreated` events.
+
+Course and enrollment APIs, QR issuance, attendance transaction indexing, and a full event-reorg-aware indexer remain out of scope. Do not treat successful CI as production deployment or as live wallet/attendance acceptance.
