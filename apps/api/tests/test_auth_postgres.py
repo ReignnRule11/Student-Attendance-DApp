@@ -13,14 +13,15 @@ from app.settings import settings
 
 @pytest.fixture
 def client():
-    migration = Path(__file__).parents[1] / "migrations" / "001_secure_identity.sql"
+    migrations = Path(__file__).parents[1] / "migrations"
 
     async def prepare_database():
         connection = await asyncpg.connect(settings.database_url)
         try:
-            await connection.execute(migration.read_text(encoding="utf-8"))
+            for name in ("001_secure_identity.sql", "004_auth_rate_limits.sql"):
+                await connection.execute((migrations / name).read_text(encoding="utf-8"))
             await connection.execute(
-                "TRUNCATE auth_sessions, auth_challenges, organization_memberships, users, organizations RESTART IDENTITY CASCADE"
+                "TRUNCATE auth_rate_limits, auth_sessions, auth_challenges, organization_memberships, users, organizations RESTART IDENTITY CASCADE"
             )
         finally:
             await connection.close()
