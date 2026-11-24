@@ -112,8 +112,14 @@ def test_tenant_isolation_and_role_enforcement(client):
     other = Account.create()
     login(client, student)
     student_org = asyncio.run(insert_org_and_membership(student, role="student"))
+
+    # Authenticate the second wallet so /auth/verify creates its users row
+    # before the test fixture inserts that wallet's organization membership.
+    login(client, other)
     other_org = asyncio.run(insert_org_and_membership(other, role="owner"))
 
+    # Restore the first wallet's session for the tenant-isolation assertions.
+    login(client, student)
     own = client.get(f"/organizations/{student_org}/workspace")
     assert own.status_code == 200
     assert own.json()["role"] == "student"
