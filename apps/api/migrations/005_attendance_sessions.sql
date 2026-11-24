@@ -17,3 +17,15 @@ CREATE TABLE IF NOT EXISTS attendance_sessions (
 );
 CREATE INDEX IF NOT EXISTS idx_attendance_sessions_org_created
     ON attendance_sessions(organization_id, created_at DESC);
+
+ALTER TABLE organization_audit_events
+    DROP CONSTRAINT IF EXISTS organization_audit_events_event_type_check;
+ALTER TABLE organization_audit_events
+    ADD CONSTRAINT organization_audit_events_event_type_check
+    CHECK (event_type IN (
+        'organization.bootstrapped',
+        'membership.role_changed',
+        'membership.revoked',
+        'membership.reactivated',
+        'attendance.session_registered'
+    ));
