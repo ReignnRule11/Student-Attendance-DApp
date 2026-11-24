@@ -81,10 +81,9 @@ async def bootstrap_organization(
             await connection.execute(
                 """INSERT INTO organization_audit_events
                    (organization_id, actor_user_id, event_type, metadata)
-                   VALUES ($1, $2, 'organization.bootstrapped', jsonb_build_object('name', $3))""",
+                   VALUES ($1, $2, 'organization.bootstrapped', '{}'::jsonb)""",
                 organization_id,
                 session["user_id"],
-                payload.name.strip(),
             )
     except asyncpg.UniqueViolationError:
         raise HTTPException(status_code=409, detail="Organization bootstrap already consumed")
