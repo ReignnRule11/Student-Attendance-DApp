@@ -112,7 +112,8 @@ async def register_attendance_session(
     contract = settings.attendance_contract_address.lower()
     connection = await connect()
     try:
-        row = await connection.fetchrow(
+        async with connection.transaction():
+            row = await connection.fetchrow(
             """INSERT INTO attendance_sessions
                (organization_id, chain_id, contract_address, session_id, instructor_wallet,
                 title, starts_at, ends_at, qr_nonce, creation_tx_hash, creation_block, created_by)
@@ -124,7 +125,14 @@ async def register_attendance_session(
             payload.title.strip(), verified["starts_at"], verified["ends_at"],
             verified["qr_nonce"], payload.creation_tx_hash.lower(),
             verified["creation_block"], session["user_id"],
-        )
+            )
+            await connection.execute(
+                """INSERT INTO organization_audit_events
+                   (organization_id, actor_user_id, event_type, metadata)
+                   VALUES ($1, $2, 'attendance.session_registered',
+                     jsonb_build_object('session_id', $3::text, 'tx_hash', $4::text))""",
+                organization_id, session["user_id"], str(payload.session_id), payload.creation_tx_hash.lower(),
+            )
     except asyncpg.UniqueViolationError:
         raise HTTPException(status_code=409, detail="This on-chain session or transaction is already registered")
     finally:
