@@ -4,20 +4,23 @@ from fastapi.responses import JSONResponse
 
 from app.settings import settings
 from app.database import check_database
+from app.auth import router as auth_router
 
 app = FastAPI(
     title="Student Attendance API",
-    version="0.1.0",
+    version="0.2.0",
     description="Backend services for Student Attendance DApp. Blockchain remains the attendance authority.",
 )
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,
-    allow_credentials=False,
+    allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-    allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+    allow_headers=["Authorization", "Content-Type", "X-Request-ID", "X-CSRF-Token"],
 )
+
+app.include_router(auth_router)
 
 
 @app.get("/health", tags=["health"])
