@@ -2,7 +2,7 @@ import secrets
 from typing import Any, Literal
 
 import asyncpg
-from fastapi import APIRouter, Cookie, Depends, Header, HTTPException
+from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Path
 from pydantic import BaseModel, Field
 
 from app.auth import CSRF_COOKIE, connect, current_session, digest
@@ -185,8 +185,8 @@ async def list_organization_members(
 @router.put("/{organization_id}/members/{wallet_address}", status_code=200)
 async def upsert_organization_member(
     organization_id: int,
-    wallet_address: str = Field(pattern=r"^0x[a-fA-F0-9]{40}$"),
-    payload: MembershipRequest = ...,
+    payload: MembershipRequest,
+    wallet_address: str = Path(pattern=r"^0x[a-fA-F0-9]{40}$"),
     csrf_cookie: str | None = Cookie(default=None, alias=CSRF_COOKIE),
     csrf_header: str | None = Header(default=None, alias="X-CSRF-Token"),
     session=Depends(current_session),
