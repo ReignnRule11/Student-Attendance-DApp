@@ -1,10 +1,11 @@
 import re
 from typing import Any
 
+import asyncpg
 import httpx
 from eth_abi import decode
 from eth_utils import keccak
-from fastapi import APIRouter, Depends, Header, HTTPException, Path
+from fastapi import APIRouter, Cookie, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from app.auth import CSRF_COOKIE, connect, current_session
@@ -13,7 +14,6 @@ from app.settings import settings
 
 router = APIRouter(prefix="/organizations", tags=["attendance sessions"])
 SESSION_CREATED_TOPIC = "0x" + keccak(text="SessionCreated(uint256,address,uint64,uint64,uint64)").hex()
-TX_HASH_RE = re.compile(r"^0x[a-fA-F0-9]{64}$")
 
 
 class SessionRegistration(BaseModel):
@@ -42,21 +42,22 @@ async def _rpc(method: str, params: list[Any]) -> Any:
             payload = response.json()
     except (httpx.HTTPError, ValueError):
         raise HTTPException(status_code=502, detail="Sepolia RPC request failed")
-    if payload.get("error") or "result" not in payload:
+    if not isinstance(payload, dict) or payload.get("error") or "result" not in payload:
         raise HTTPException(status_code=502, detail="Sepolia RPC returned an invalid response")
     return payload["result"]
 
 
 async def verify_session_creation(tx_hash: str, session_id: int, instructor_wallet: str) -> dict[str, int]:
-    if not settings.attendance_contract_address:
-        raise HTTPException(status_code=503, detail="Attendance contract is not configured")
-    contract = settings.attendance_contract_address.lower()
+    contract = (settings.attendance_contract_address or "").lower()
     if not re.fullmatch(r"0x[a-f0-9]{40}", contract):
-        raise HTTPException(status_code=503, detail="Attendance contract configuration is invalid")
+        raise HTTPException(status_code=503, detail="Attendance contract is not configured correctly")
 
     chain_id = await _rpc("eth_chainId", [])
-    if int(chain_id, 16) != 11155111:
-        raise HTTPException(status_code=503, detail="Configured RPC is not Ethereum Sepolia")
+    try:
+        if int(chain_id, 16) != 11155111:
+            raise HTTPException(status_code=503, detail="Configured RPC is not Ethereum Sepolia")
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=502, detail="Sepolia RPC returned an invalid chain ID")
 
     tx = await _rpc("eth_getTransactionByHash", [tx_hash])
     receipt = await _rpc("eth_getTransactionReceipt", [tx_hash])
@@ -81,6 +82,7 @@ async def verify_session_creation(tx_hash: str, session_id: int, instructor_wall
             starts_at, ends_at, qr_nonce = decode(
                 ["uint64", "uint64", "uint64"], bytes.fromhex(log["data"].removeprefix("0x"))
             )
+            block_number = int(receipt["blockNumber"], 16)
         except (ValueError, KeyError, TypeError):
             raise HTTPException(status_code=502, detail="SessionCreated event data is malformed")
         if event_instructor != instructor_wallet.lower():
@@ -89,7 +91,7 @@ async def verify_session_creation(tx_hash: str, session_id: int, instructor_wall
             raise HTTPException(status_code=422, detail="SessionCreated event contains invalid session values")
         return {
             "starts_at": int(starts_at), "ends_at": int(ends_at),
-            "qr_nonce": int(qr_nonce), "creation_block": int(receipt["blockNumber"], 16),
+            "qr_nonce": int(qr_nonce), "creation_block": block_number,
         }
     raise HTTPException(status_code=422, detail="Transaction does not contain the expected SessionCreated event")
 
@@ -98,25 +100,62 @@ async def verify_session_creation(tx_hash: str, session_id: int, instructor_wall
 async def register_attendance_session(
     organization_id: int,
     payload: SessionRegistration,
-    csrf_cookie: str | None = Header(default=None, alias="Cookie"),
+    csrf_cookie: str | None = Cookie(default=None, alias=CSRF_COOKIE),
     csrf_header: str | None = Header(default=None, alias="X-CSRF-Token"),
     membership=Depends(require_org_membership("owner", "admin", "instructor")),
     session=Depends(current_session),
 ):
-    # The CSRF cookie is read from the request's Cookie header by FastAPI below.
-    from fastapi import Request
-    # Explicit CSRF validation is performed in the request wrapper dependency.
-    # The cookie/header pair is checked before persistence; the session hash binds it.
-    if not csrf_header:
-        raise HTTPException(status_code=403, detail="CSRF validation failed")
+    require_csrf(session, csrf_cookie, csrf_header)
+    verified = await verify_session_creation(
+        payload.creation_tx_hash, payload.session_id, session["wallet_address"]
+    )
+    contract = settings.attendance_contract_address.lower()
     connection = await connect()
     try:
-        csrf_row = await connection.fetchrow(
-            "SELECT csrf_hash FROM auth_sessions WHERE user_id = $1 AND token_hash = $2 AND revoked_at IS NULL",
-            session["user_id"], __import__("hashlib").sha256(session.get("session_token", "").encode()).hexdigest()
+        row = await connection.fetchrow(
+            """INSERT INTO attendance_sessions
+               (organization_id, chain_id, contract_address, session_id, instructor_wallet,
+                title, starts_at, ends_at, qr_nonce, creation_tx_hash, creation_block, created_by)
+               VALUES ($1, 11155111, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+               RETURNING id, organization_id, chain_id, contract_address, session_id,
+                         instructor_wallet, title, starts_at, ends_at, qr_nonce,
+                         creation_tx_hash, creation_block, created_at""",
+            organization_id, contract, payload.session_id, session["wallet_address"],
+            payload.title.strip(), verified["starts_at"], verified["ends_at"],
+            verified["qr_nonce"], payload.creation_tx_hash.lower(),
+            verified["creation_block"], session["user_id"],
+        )
+    except asyncpg.UniqueViolationError:
+        raise HTTPException(status_code=409, detail="This on-chain session or transaction is already registered")
+    finally:
+        await connection.close()
+    result = dict(row)
+    result["session_id"] = str(result["session_id"])
+    result["contract_address"] = result["contract_address"]
+    return result
+
+
+@router.get("/{organization_id}/attendance-sessions")
+async def list_attendance_sessions(
+    organization_id: int,
+    membership=Depends(require_org_membership()),
+):
+    connection = await connect()
+    try:
+        rows = await connection.fetch(
+            """SELECT id, organization_id, chain_id, contract_address, session_id,
+                      instructor_wallet, title, starts_at, ends_at, qr_nonce,
+                      creation_tx_hash, creation_block, created_at
+               FROM attendance_sessions
+               WHERE organization_id = $1
+               ORDER BY created_at DESC, id DESC""",
+            organization_id,
         )
     finally:
         await connection.close()
-    # current_session intentionally does not expose the raw session token. Validate the
-    # double-submit cookie/header via a dedicated request dependency instead.
-    raise HTTPException(status_code=501, detail="Session registration requires CSRF request binding")
+    sessions = []
+    for row in rows:
+        item = dict(row)
+        item["session_id"] = str(item["session_id"])
+        sessions.append(item)
+    return {"organization_id": organization_id, "sessions": sessions}
