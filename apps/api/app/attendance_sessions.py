@@ -1,4 +1,5 @@
 import re
+from decimal import Decimal
 from typing import Any
 
 import asyncpg
@@ -124,9 +125,9 @@ async def register_attendance_session(
                RETURNING id, organization_id, chain_id, contract_address, session_id,
                          instructor_wallet, title, starts_at, ends_at, qr_nonce,
                          creation_tx_hash, creation_block, created_at""",
-            organization_id, contract, session_id, session["wallet_address"],
-            payload.title.strip(), verified["starts_at"], verified["ends_at"],
-            verified["qr_nonce"], payload.creation_tx_hash.lower(),
+            organization_id, contract, Decimal(session_id), session["wallet_address"],
+            payload.title.strip(), Decimal(verified["starts_at"]), Decimal(verified["ends_at"]),
+            Decimal(verified["qr_nonce"]), payload.creation_tx_hash.lower(),
             verified["creation_block"], session["user_id"],
             )
             await connection.execute(
@@ -142,7 +143,8 @@ async def register_attendance_session(
         await connection.close()
     result = dict(row)
     result["session_id"] = str(result["session_id"])
-    result["contract_address"] = result["contract_address"]
+    for field in ("starts_at", "ends_at", "qr_nonce"):
+        result[field] = int(result[field])
     return result
 
 
@@ -168,5 +170,7 @@ async def list_attendance_sessions(
     for row in rows:
         item = dict(row)
         item["session_id"] = str(item["session_id"])
+        for field in ("starts_at", "ends_at", "qr_nonce"):
+            item[field] = int(item[field])
         sessions.append(item)
     return {"organization_id": organization_id, "sessions": sessions}
