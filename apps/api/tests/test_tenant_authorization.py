@@ -56,10 +56,10 @@ def client():
         try:
             migrations = Path(__file__).parents[1] / "migrations"
             for migration in ("001_secure_identity.sql", "002_tenant_authorization.sql",
-                              "003_membership_management.sql"):
+                              "003_membership_management.sql", "004_auth_rate_limits.sql"):
                 await connection.execute((migrations / migration).read_text(encoding="utf-8"))
             await connection.execute(
-                "TRUNCATE organization_audit_events, auth_sessions, auth_challenges, organization_memberships, users, organizations RESTART IDENTITY CASCADE"
+                "TRUNCATE organization_audit_events, auth_rate_limits, auth_sessions, auth_challenges, organization_memberships, users, organizations RESTART IDENTITY CASCADE"
             )
         finally:
             await connection.close()

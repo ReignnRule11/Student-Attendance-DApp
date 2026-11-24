@@ -13,14 +13,15 @@ from app.settings import settings
 
 @pytest.fixture
 def client():
-    migration = Path(__file__).parents[1] / "migrations" / "001_secure_identity.sql"
+    migrations = Path(__file__).parents[1] / "migrations"
 
     async def prepare_database():
         connection = await asyncpg.connect(settings.database_url)
         try:
-            await connection.execute(migration.read_text(encoding="utf-8"))
+            for name in ("001_secure_identity.sql", "004_auth_rate_limits.sql"):
+                await connection.execute((migrations / name).read_text(encoding="utf-8"))
             await connection.execute(
-                "TRUNCATE auth_sessions, auth_challenges, organization_memberships, users, organizations RESTART IDENTITY CASCADE"
+                "TRUNCATE auth_rate_limits, auth_sessions, auth_challenges, organization_memberships, users, organizations RESTART IDENTITY CASCADE"
             )
         finally:
             await connection.close()
@@ -126,3 +127,41 @@ def test_logout_requires_csrf_and_revokes_session(client):
     logged_out = client.post("/auth/logout", headers={"X-CSRF-Token": csrf})
     assert logged_out.status_code == 200
     assert client.get("/auth/me").status_code == 401
+
+
+def test_nonce_rate_limit_persists_after_limit_is_reached(client):
+    account = Account.create()
+    statuses = [
+        client.post("/auth/nonce", json={"address": account.address}).status_code
+        for _ in range(6)
+    ]
+    assert statuses == [200, 200, 200, 200, 200, 429]
+
+    async def inspect_limiter():
+        connection = await asyncpg.connect(settings.database_url)
+        try:
+            row = await connection.fetchrow(
+                "SELECT subject_hash, request_count FROM auth_rate_limits WHERE scope = 'nonce_wallet'"
+            )
+            return row
+        finally:
+            await connection.close()
+
+    row = asyncio.run(inspect_limiter())
+    assert row["request_count"] == 5
+    assert row["subject_hash"] != account.address.lower()
+    assert len(row["subject_hash"].strip()) == 64
+
+
+def test_failed_signature_attempts_consume_verification_limit(client):
+    account = Account.create()
+    challenge, _ = issue_and_sign(client, account)
+    payload = {
+        "address": account.address,
+        "nonce": challenge["nonce"],
+        "message": challenge["message"],
+        "signature": "0x" + ("0" * 130),
+    }
+    statuses = [client.post("/auth/verify", json=payload).status_code for _ in range(11)]
+    assert statuses[:10] == [401] * 10
+    assert statuses[10] == 429
