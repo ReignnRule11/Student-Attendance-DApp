@@ -55,8 +55,9 @@ def client():
     async def prepare_database():
         connection = await asyncpg.connect(settings.database_url)
         try:
-            migration = __import__("pathlib").Path(__file__).parents[1] / "migrations" / "002_tenant_authorization.sql"
-            await connection.execute(migration.read_text(encoding="utf-8"))
+            migrations = __import__("pathlib").Path(__file__).parents[1] / "migrations"
+            await connection.execute((migrations / "001_secure_identity.sql").read_text(encoding="utf-8"))
+            await connection.execute((migrations / "002_tenant_authorization.sql").read_text(encoding="utf-8"))
             await connection.execute(
                 "TRUNCATE organization_audit_events, auth_sessions, auth_challenges, organization_memberships, users, organizations RESTART IDENTITY CASCADE"
             )
