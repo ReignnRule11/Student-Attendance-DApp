@@ -19,6 +19,27 @@ permissions:
 jobs:
   api:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: attendance
+          POSTGRES_PASSWORD: attendance
+          POSTGRES_DB: attendance
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U attendance -d attendance"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://attendance:attendance@localhost:5432/attendance
+      API_ALLOWED_ORIGINS: '["http://localhost:3000"]'
+      ENVIRONMENT: test
+      SIWE_DOMAIN: localhost
+      SIWE_URI: http://localhost:3000
+      SIWE_CHAIN_ID: "11155111"
     defaults:
       run:
         working-directory: apps/api
