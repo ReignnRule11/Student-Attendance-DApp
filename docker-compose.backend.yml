@@ -1,0 +1,33 @@
+services:
+  attendance-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: attendance
+      POSTGRES_USER: attendance
+      POSTGRES_PASSWORD: attendance
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U attendance -d attendance"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - attendance_pgdata:/var/lib/postgresql/data
+
+  attendance-api:
+    build:
+      context: ./apps/api
+    dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://attendance:attendance@attendance-db:5432/attendance
+      API_ALLOWED_ORIGINS: '["http://localhost:3000"]'
+      ENVIRONMENT: development
+    ports:
+      - "8000:8000"
+    depends_on:
+      attendance-db:
+        condition: service_healthy
+
+volumes:
+  attendance_pgdata:
