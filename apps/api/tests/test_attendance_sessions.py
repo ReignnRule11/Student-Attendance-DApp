@@ -83,7 +83,7 @@ def test_instructor_can_register_only_a_verified_chain_session(client, monkeypat
 
     monkeypatch.setattr(attendance_sessions, "verify_session_creation", verified)
     payload = {
-        "session_id": 17,
+        "session_id": "17",
         "title": "CS101 Lecture",
         "creation_tx_hash": "0x" + "a" * 64,
     }
@@ -120,7 +120,7 @@ def test_student_cannot_register_attendance_sessions(client, monkeypatch):
     monkeypatch.setattr(attendance_sessions, "verify_session_creation", should_not_verify)
     response = client.post(
         f"/organizations/{organization_id}/attendance-sessions",
-        json={"session_id": 2, "title": "Lecture", "creation_tx_hash": "0x" + "b" * 64},
+        json={"session_id": "2", "title": "Lecture", "creation_tx_hash": "0x" + "b" * 64},
         headers={"X-CSRF-Token": csrf},
     )
     assert response.status_code == 403
