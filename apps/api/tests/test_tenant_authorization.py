@@ -186,7 +186,7 @@ def test_revoke_reactivate_and_audit_history(client):
     organization_id = asyncio.run(insert_org_and_membership(owner, role="owner"))
     login(client, member)
     asyncio.run(add_membership_fixture(organization_id, member, "student"))
-    login(client, owner)
+    owner_csrf = login(client, owner)
 
     revoke = client.delete(
         f"/organizations/{organization_id}/members/{member.address}",
