@@ -37,6 +37,9 @@ def issue_and_sign(client: TestClient, account):
     signature = Account.sign_message(
         encode_defunct(text=challenge["message"]), private_key=account.key
     ).signature.hex()
+    # HexBytes versions differ on whether .hex() includes the 0x prefix.
+    if not signature.startswith("0x"):
+        signature = "0x" + signature
     return challenge, signature
 
 
@@ -63,7 +66,12 @@ def test_wallet_login_and_nonce_replay_rejected(client):
 def test_signature_from_another_wallet_is_rejected(client):
     requested = Account.create()
     attacker = Account.create()
-    challenge, signature = issue_and_sign(client, attacker)
+    challenge, _ = issue_and_sign(client, requested)
+    signature = Account.sign_message(
+        encode_defunct(text=challenge["message"]), private_key=attacker.key
+    ).signature.hex()
+    if not signature.startswith("0x"):
+        signature = "0x" + signature
     payload = {
         "address": requested.address,
         "nonce": challenge["nonce"],
