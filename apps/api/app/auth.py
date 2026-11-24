@@ -6,7 +6,7 @@ from typing import Any
 import asyncpg
 from eth_account import Account
 from eth_account.messages import encode_defunct
-from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Response
+from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from app.settings import settings
@@ -16,6 +16,7 @@ SESSION_COOKIE = "attendance_session"
 CSRF_COOKIE = "attendance_csrf"
 SESSION_TTL = timedelta(hours=12)
 CHALLENGE_TTL = timedelta(minutes=5)
+RATE_WINDOW = timedelta(minutes=15)
 
 
 def digest(value: str) -> str:
@@ -23,6 +24,7 @@ def digest(value: str) -> str:
 
 
 def build_siwe_message(address: str, nonce: str, issued_at: datetime, expires_at: datetime) -> str:
+    """Build the app's documented EIP-191 wallet challenge (not full EIP-4361 SIWE)."""
     return (
         f"{settings.siwe_domain} wants you to sign in with your Ethereum account:\n"
         f"{address}\n\n"
@@ -49,6 +51,31 @@ async def connect() -> asyncpg.Connection:
     return await asyncpg.connect(settings.database_url)
 
 
+async def enforce_rate_limit(
+    connection: asyncpg.Connection, scope: str, subject: str, limit: int
+) -> None:
+    """Atomic PostgreSQL fixed-window limiter; stores only a hash of the subject."""
+    row = await connection.fetchrow(
+        """INSERT INTO auth_rate_limits (scope, subject_hash, window_started_at, request_count)
+           VALUES ($1, $2, now(), 1)
+           ON CONFLICT (scope, subject_hash) DO UPDATE SET
+             window_started_at = CASE
+               WHEN auth_rate_limits.window_started_at <= now() - $3::interval THEN now()
+               ELSE auth_rate_limits.window_started_at END,
+             request_count = CASE
+               WHEN auth_rate_limits.window_started_at <= now() - $3::interval THEN 1
+               ELSE auth_rate_limits.request_count + 1 END
+           RETURNING request_count""",
+        scope, digest(subject), RATE_WINDOW,
+    )
+    if row["request_count"] > limit:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many authentication requests. Try again after 15 minutes.",
+            headers={"Retry-After": str(int(RATE_WINDOW.total_seconds()))},
+        )
+
+
 def set_session_cookies(response: Response, session_token: str, csrf_token: str) -> None:
     secure = settings.environment.lower() in {"production", "staging"}
     response.set_cookie(SESSION_COOKIE, session_token, httponly=True, secure=secure,
@@ -58,69 +85,78 @@ def set_session_cookies(response: Response, session_token: str, csrf_token: str)
 
 
 @router.post("/nonce")
-async def issue_nonce(payload: NonceRequest) -> dict[str, Any]:
+async def issue_nonce(payload: NonceRequest, request: Request) -> dict[str, Any]:
     address = payload.address.lower()
+    client_ip = request.client.host if request.client else "unknown"
     nonce = secrets.token_urlsafe(24)
     now = datetime.now(timezone.utc)
     expires = now + CHALLENGE_TTL
     message = build_siwe_message(address, nonce, now, expires)
     connection = await connect()
     try:
-        await connection.execute(
-            """INSERT INTO auth_challenges (nonce_hash, wallet_address, message, expires_at)
-               VALUES ($1, $2, $3, $4)""", digest(nonce), address, message, expires,
-        )
+        async with connection.transaction():
+            await enforce_rate_limit(connection, "nonce_ip", client_ip, 30)
+            await enforce_rate_limit(connection, "nonce_wallet", address, 5)
+            await connection.execute(
+                """INSERT INTO auth_challenges (nonce_hash, wallet_address, message, expires_at)
+                   VALUES ($1, $2, $3, $4)""", digest(nonce), address, message, expires,
+            )
     finally:
         await connection.close()
     return {"nonce": nonce, "message": message, "expires_at": expires.isoformat()}
 
 
 @router.post("/verify")
-async def verify_signature(payload: VerifyRequest, response: Response) -> dict[str, Any]:
+async def verify_signature(payload: VerifyRequest, request: Request, response: Response) -> dict[str, Any]:
     address = payload.address.lower()
+    client_ip = request.client.host if request.client else "unknown"
     connection = await connect()
     try:
-        challenge = await connection.fetchrow(
-            """SELECT wallet_address, message, expires_at, consumed_at
-               FROM auth_challenges WHERE nonce_hash = $1""", digest(payload.nonce)
-        )
-        if not challenge or challenge["consumed_at"] is not None:
-            raise HTTPException(status_code=401, detail="Challenge is invalid or already used")
-        if challenge["wallet_address"] != address or challenge["message"] != payload.message:
-            raise HTTPException(status_code=401, detail="Signed message does not match challenge")
-        if challenge["expires_at"] <= datetime.now(timezone.utc):
-            raise HTTPException(status_code=401, detail="Challenge expired")
-        try:
-            recovered = Account.recover_message(
-                encode_defunct(text=payload.message), signature=payload.signature
-            ).lower()
-        except Exception:
-            raise HTTPException(status_code=401, detail="Invalid wallet signature")
-        if recovered != address:
-            raise HTTPException(status_code=401, detail="Signature wallet mismatch")
-        consumed = await connection.execute(
-            """UPDATE auth_challenges SET consumed_at = now()
-               WHERE nonce_hash = $1 AND consumed_at IS NULL AND expires_at > now()""",
-            digest(payload.nonce),
-        )
-        if consumed != "UPDATE 1":
-            raise HTTPException(status_code=401, detail="Challenge already consumed")
-        await connection.execute(
-            """INSERT INTO users (wallet_address) VALUES ($1)
-               ON CONFLICT (wallet_address) DO NOTHING""", address
-        )
-        user = await connection.fetchrow("SELECT id FROM users WHERE wallet_address = $1", address)
-        session_token, csrf_token = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
-        expires_at = datetime.now(timezone.utc) + SESSION_TTL
-        await connection.execute(
-            """INSERT INTO auth_sessions (token_hash, csrf_hash, user_id, expires_at)
-               VALUES ($1, $2, $3, $4)""",
-            digest(session_token), digest(csrf_token), user["id"], expires_at,
-        )
-        memberships = await connection.fetch(
-            """SELECT organization_id, role FROM organization_memberships
-               WHERE user_id = $1 AND revoked_at IS NULL ORDER BY organization_id""", user["id"]
-        )
+        async with connection.transaction():
+            await enforce_rate_limit(connection, "verify_ip", client_ip, 60)
+            await enforce_rate_limit(connection, "verify_wallet", address, 10)
+            challenge = await connection.fetchrow(
+                """SELECT wallet_address, message, expires_at, consumed_at
+                   FROM auth_challenges WHERE nonce_hash = $1 FOR UPDATE""",
+                digest(payload.nonce),
+            )
+            if not challenge or challenge["consumed_at"] is not None:
+                raise HTTPException(status_code=401, detail="Challenge is invalid or already used")
+            if challenge["wallet_address"] != address or challenge["message"] != payload.message:
+                raise HTTPException(status_code=401, detail="Signed message does not match challenge")
+            if challenge["expires_at"] <= datetime.now(timezone.utc):
+                raise HTTPException(status_code=401, detail="Challenge expired")
+            try:
+                recovered = Account.recover_message(
+                    encode_defunct(text=payload.message), signature=payload.signature
+                ).lower()
+            except Exception:
+                raise HTTPException(status_code=401, detail="Invalid wallet signature")
+            if recovered != address:
+                raise HTTPException(status_code=401, detail="Signature wallet mismatch")
+            consumed = await connection.execute(
+                """UPDATE auth_challenges SET consumed_at = now()
+                   WHERE nonce_hash = $1 AND consumed_at IS NULL AND expires_at > now()""",
+                digest(payload.nonce),
+            )
+            if consumed != "UPDATE 1":
+                raise HTTPException(status_code=401, detail="Challenge already consumed")
+            await connection.execute(
+                """INSERT INTO users (wallet_address) VALUES ($1)
+                   ON CONFLICT (wallet_address) DO NOTHING""", address
+            )
+            user = await connection.fetchrow("SELECT id FROM users WHERE wallet_address = $1", address)
+            session_token, csrf_token = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
+            expires_at = datetime.now(timezone.utc) + SESSION_TTL
+            await connection.execute(
+                """INSERT INTO auth_sessions (token_hash, csrf_hash, user_id, expires_at)
+                   VALUES ($1, $2, $3, $4)""",
+                digest(session_token), digest(csrf_token), user["id"], expires_at,
+            )
+            memberships = await connection.fetch(
+                """SELECT organization_id, role FROM organization_memberships
+                   WHERE user_id = $1 AND revoked_at IS NULL ORDER BY organization_id""", user["id"]
+            )
     finally:
         await connection.close()
     set_session_cookies(response, session_token, csrf_token)
