@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.settings import settings
 from app.database import check_database
@@ -10,7 +11,6 @@ app = FastAPI(
     description="Backend services for Student Attendance DApp. Blockchain remains the attendance authority.",
 )
 
-# Restrict origins in production via API_ALLOWED_ORIGINS. Wildcard is only a local-development default.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,
@@ -28,7 +28,9 @@ async def health():
 @app.get("/ready", tags=["health"])
 async def readiness():
     database_ready = await check_database()
-    return {
-        "status": "ready" if database_ready else "degraded",
-        "checks": {"database": "ok" if database_ready else "unavailable"},
-    }
+    if not database_ready:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "degraded", "checks": {"database": "unavailable"}},
+        )
+    return {"status": "ready", "checks": {"database": "ok"}}
