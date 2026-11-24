@@ -17,7 +17,7 @@ SESSION_CREATED_TOPIC = "0x" + keccak(text="SessionCreated(uint256,address,uint6
 
 
 class SessionRegistration(BaseModel):
-    session_id: int = Field(gt=0)
+    session_id: str = Field(pattern=r"^[1-9][0-9]{0,77}$")
     title: str = Field(min_length=2, max_length=160)
     creation_tx_hash: str = Field(pattern=r"^0x[a-fA-F0-9]{64}$")
 
@@ -106,8 +106,11 @@ async def register_attendance_session(
     session=Depends(current_session),
 ):
     require_csrf(session, csrf_cookie, csrf_header)
+    session_id = int(payload.session_id)
+    if session_id > (2**256 - 1):
+        raise HTTPException(status_code=422, detail="Session ID exceeds uint256")
     verified = await verify_session_creation(
-        payload.creation_tx_hash, payload.session_id, session["wallet_address"]
+        payload.creation_tx_hash, session_id, session["wallet_address"]
     )
     contract = settings.attendance_contract_address.lower()
     connection = await connect()
@@ -121,7 +124,7 @@ async def register_attendance_session(
                RETURNING id, organization_id, chain_id, contract_address, session_id,
                          instructor_wallet, title, starts_at, ends_at, qr_nonce,
                          creation_tx_hash, creation_block, created_at""",
-            organization_id, contract, payload.session_id, session["wallet_address"],
+            organization_id, contract, session_id, session["wallet_address"],
             payload.title.strip(), verified["starts_at"], verified["ends_at"],
             verified["qr_nonce"], payload.creation_tx_hash.lower(),
             verified["creation_block"], session["user_id"],
@@ -131,7 +134,7 @@ async def register_attendance_session(
                    (organization_id, actor_user_id, event_type, metadata)
                    VALUES ($1, $2, 'attendance.session_registered',
                      jsonb_build_object('session_id', $3::text, 'tx_hash', $4::text))""",
-                organization_id, session["user_id"], str(payload.session_id), payload.creation_tx_hash.lower(),
+                organization_id, session["user_id"], str(session_id), payload.creation_tx_hash.lower(),
             )
     except asyncpg.UniqueViolationError:
         raise HTTPException(status_code=409, detail="This on-chain session or transaction is already registered")
