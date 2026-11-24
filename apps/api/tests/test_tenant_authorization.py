@@ -97,12 +97,14 @@ def test_bootstrap_requires_secret_csrf_and_is_one_time(client, monkeypatch):
     })
     assert second.status_code == 409
 
-    connection = asyncio.run(asyncpg.connect(settings.database_url))
-    try:
-        events = await connection.fetchval("SELECT count(*) FROM organization_audit_events")
-        assert events == 1
-    finally:
-        await connection.close()
+    async def count_audit_events():
+        connection = await asyncpg.connect(settings.database_url)
+        try:
+            return await connection.fetchval("SELECT count(*) FROM organization_audit_events")
+        finally:
+            await connection.close()
+
+    assert asyncio.run(count_audit_events()) == 1
 
 
 def test_tenant_isolation_and_role_enforcement(client):
