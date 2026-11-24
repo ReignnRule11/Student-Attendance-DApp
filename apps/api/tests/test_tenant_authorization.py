@@ -148,11 +148,12 @@ def test_owner_can_manage_members_and_admin_cannot_escalate(client):
     )
     assert escalated.status_code == 403
 
-    # Authenticate outsider first; admin can then add them as a student.
+    # Authenticate outsider first so their wallet exists, then restore the admin session.
     login(client, outsider)
+    admin_csrf = login(client, admin)
     lower_role = client.put(
         f"/organizations/{organization_id}/members/{outsider.address}",
-        json={"role": "student"}, headers={"X-CSRF-Token": client.cookies.get("attendance_csrf")},
+        json={"role": "student"}, headers={"X-CSRF-Token": admin_csrf},
     )
     assert lower_role.status_code == 200
 
