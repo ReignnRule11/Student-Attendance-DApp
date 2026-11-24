@@ -92,15 +92,19 @@ async def issue_nonce(payload: NonceRequest, request: Request) -> dict[str, Any]
     now = datetime.now(timezone.utc)
     expires = now + CHALLENGE_TTL
     message = build_siwe_message(address, nonce, now, expires)
+    limiter = await connect()
+    try:
+        async with limiter.transaction():
+            await enforce_rate_limit(limiter, "nonce_ip", client_ip, 30)
+            await enforce_rate_limit(limiter, "nonce_wallet", address, 5)
+    finally:
+        await limiter.close()
     connection = await connect()
     try:
-        async with connection.transaction():
-            await enforce_rate_limit(connection, "nonce_ip", client_ip, 30)
-            await enforce_rate_limit(connection, "nonce_wallet", address, 5)
-            await connection.execute(
-                """INSERT INTO auth_challenges (nonce_hash, wallet_address, message, expires_at)
-                   VALUES ($1, $2, $3, $4)""", digest(nonce), address, message, expires,
-            )
+        await connection.execute(
+            """INSERT INTO auth_challenges (nonce_hash, wallet_address, message, expires_at)
+               VALUES ($1, $2, $3, $4)""", digest(nonce), address, message, expires,
+        )
     finally:
         await connection.close()
     return {"nonce": nonce, "message": message, "expires_at": expires.isoformat()}
@@ -110,11 +114,16 @@ async def issue_nonce(payload: NonceRequest, request: Request) -> dict[str, Any]
 async def verify_signature(payload: VerifyRequest, request: Request, response: Response) -> dict[str, Any]:
     address = payload.address.lower()
     client_ip = request.client.host if request.client else "unknown"
+    limiter = await connect()
+    try:
+        async with limiter.transaction():
+            await enforce_rate_limit(limiter, "verify_ip", client_ip, 60)
+            await enforce_rate_limit(limiter, "verify_wallet", address, 10)
+    finally:
+        await limiter.close()
     connection = await connect()
     try:
         async with connection.transaction():
-            await enforce_rate_limit(connection, "verify_ip", client_ip, 60)
-            await enforce_rate_limit(connection, "verify_wallet", address, 10)
             challenge = await connection.fetchrow(
                 """SELECT wallet_address, message, expires_at, consumed_at
                    FROM auth_challenges WHERE nonce_hash = $1 FOR UPDATE""",
