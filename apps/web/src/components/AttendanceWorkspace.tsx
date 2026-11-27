@@ -13,6 +13,7 @@ import {
   savePendingTransaction,
 } from "../lib/contract/transactions";
 import { AuthorizationSigner } from "./AuthorizationSigner";
+import { InstructorBackendPanel } from "./InstructorBackendPanel";
 import { StudentAttendanceScanner } from "./StudentAttendanceScanner";
 
 type WorkspaceTab = "checkin" | "instructor" | "admin";
@@ -653,6 +654,10 @@ export function AttendanceWorkspace() {
                 <p className="status-message">Attendance for #{sessionIdInput}: {lookupAttended ? "Recorded" : "Not recorded"}</p>
               )}
             </article>
+
+            <InstructorBackendPanel
+              canUseInstructorTools={Boolean(isConnected && onSepolia && configured && (isInstructor || isAdmin))}
+            />
           </div>
         </div>
       )}
